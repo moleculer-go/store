@@ -1,7 +1,6 @@
 package db
 
 import (
-	"github.com/hashicorp/go-memdb"
 	snap "github.com/moleculer-go/cupaloy"
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/payload"
@@ -11,61 +10,15 @@ import (
 
 var _ = Describe("MemoryAdapter", func() {
 
-	adapter := &MemoryAdapter{
-		Table: "user",
-		Schema: &memdb.DBSchema{
-			Tables: map[string]*memdb.TableSchema{
-				"user": &memdb.TableSchema{
-					Name: "user",
-					Indexes: map[string]*memdb.IndexSchema{
-						"id": &memdb.IndexSchema{
-							Name:    "id",
-							Unique:  true,
-							Indexer: &PayloadIndex{Field: "id"},
-						},
-						"name": &memdb.IndexSchema{
-							Name:    "name",
-							Unique:  false,
-							Indexer: &PayloadIndex{Field: "name"},
-						},
-					},
-				},
-			},
-		},
-	}
+	adapter := userAdapter()
 
-	var johnSnow, marie, johnTravolta moleculer.Payload
+	var johnTravolta moleculer.Payload
 	BeforeEach(func() {
-		err := adapter.Connect()
-		if err != nil {
-			panic(err)
-		}
-		johnSnow = adapter.Insert(payload.Create(map[string]interface{}{
-			"name":     "John",
-			"lastname": "Snow",
-			"age":      25,
-		}))
-		Expect(johnSnow.IsError()).Should(BeFalse())
-
-		marie = adapter.Insert(payload.Create(map[string]interface{}{
-			"name":     "Marie",
-			"lastname": "Claire",
-			"age":      75,
-		}))
-		Expect(marie.IsError()).Should(BeFalse())
-
-		johnTravolta = adapter.Insert(payload.Create(map[string]interface{}{
-			"name":     "John",
-			"lastname": "Travolta",
-			"age":      65,
-		}))
-		Expect(johnTravolta.IsError()).Should(BeFalse())
+		_, _, johnTravolta = connectAndLoadUsers(adapter)
 	})
 
 	AfterEach(func() {
-		johnSnow = nil
 		johnTravolta = nil
-		marie = nil
 		adapter.Disconnect()
 	})
 
@@ -77,6 +30,16 @@ var _ = Describe("MemoryAdapter", func() {
 		Expect(r.IsError()).Should(BeFalse())
 		Expect(r.Len()).Should(Equal(2))
 		Expect(snap.SnapshotMulti("Find()", r.Remove("id"))).Should(Succeed())
+	})
+
+	It("Count() should return matching records", func() {
+		r := adapter.Count(payload.Create(map[string]interface{}{
+			"searchFields": []string{"name"},
+			"search":       "John",
+		}))
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Int()).Should(Equal(2))
+		Expect(snap.SnapshotMulti("Count()", r)).Should(Succeed())
 	})
 
 	It("Update() should update existing record matching records", func() {

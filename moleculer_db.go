@@ -64,12 +64,14 @@ func Service(adapter Adapter) moleculer.Mixin {
 		Started: func(context moleculer.BrokerContext, svc moleculer.Service) {
 			serviceSettings = svc.Settings
 			if adapter != nil {
+				context.Logger().Debug("db-mixin started. adapter was provided on higher function!")
 				return
 			}
 			settingsAdapter, exists := serviceSettings["db-adapter"]
 			if !exists {
 				return
 			}
+			context.Logger().Debug("db-mixin started. adapter from settings!")
 			adapter = settingsAdapter.(Adapter)
 
 		},
@@ -155,14 +157,23 @@ func Service(adapter Adapter) moleculer.Mixin {
 					total := adapter.Count(params)
 					wg.Wait()
 
+					pageSize := serviceSettings["pageSize"].(int)
+					if params.Get("pageSize").Exists() {
+						pageSize = params.Get("pageSize").Int()
+					}
+					page := 1
+					if params.Get("page").Exists() {
+						page = params.Get("page").Int()
+					}
+
 					totalPages := math.Floor(
-						(total.Float() + params.Get("pageSize").Float() - 1.0) / params.Get("pageSize").Float())
+						(total.Float() + float64(pageSize) - 1.0) / float64(pageSize))
 
 					return map[string]interface{}{
 						"rows":       rows,
 						"total":      total,
-						"page":       params.Get("page").Value(),
-						"pageSize":   params.Get("pageSize").Value(),
+						"page":       page,
+						"pageSize":   pageSize,
 						"totalPages": totalPages,
 					}
 				},
