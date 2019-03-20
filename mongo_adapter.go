@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/moleculer-go/moleculer/payload"
@@ -60,7 +59,9 @@ func parseSearchFields(params, query moleculer.Payload) moleculer.Payload {
 		} else if len(fields) > 1 {
 			or := payload.EmptyList()
 			for _, field := range fields {
-				or = or.AddItem(payload.Empty().Add(field, searchValue))
+				bm := bson.M{}
+				bm[field] = searchValue
+				or = or.AddItem(bm)
 			}
 			query = query.Add("$or", or)
 		}
@@ -78,9 +79,8 @@ func (adapter *MongoAdapter) Find(params moleculer.Payload) moleculer.Payload {
 	}
 	query = parseSearchFields(params, query)
 
-	bs := query.Bson()
-	fmt.Println("Find() bs -> ", bs)
-	cursor, err := adapter.coll.Find(ctx, bs)
+	filter := query.Bson()
+	cursor, err := adapter.coll.Find(ctx, filter)
 	if err != nil {
 		return payload.Create(err)
 	}
