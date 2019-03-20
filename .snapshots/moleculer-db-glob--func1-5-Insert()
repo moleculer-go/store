@@ -1,6 +1,0 @@
-(*payload.RawPayload)((array (len=1)) {
-  (len=2) {
-  "lastname": Cesar,
-  "name": Julio,
-},
-})

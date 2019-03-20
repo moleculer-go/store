@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/moleculer-go/moleculer/payload"
@@ -45,9 +46,41 @@ func (adapter *MongoAdapter) Disconnect() error {
 	return adapter.client.Disconnect(ctx)
 }
 
+func parseSearchFields(params, query moleculer.Payload) moleculer.Payload {
+	searchFields := params.Get("searchFields")
+	search := params.Get("search")
+	searchValue := ""
+	if search.Exists() {
+		searchValue = search.String()
+	}
+	if searchFields.Exists() {
+		fields := searchFields.StringArray()
+		if len(fields) == 1 {
+			query = query.Add(fields[0], searchValue)
+		} else if len(fields) > 1 {
+			or := payload.EmptyList()
+			for _, field := range fields {
+				or = or.AddItem(payload.Empty().Add(field, searchValue))
+			}
+			query = query.Add("$or", or)
+		}
+	}
+	return query
+}
+
+// Find search the data store with the params provided.
 func (adapter *MongoAdapter) Find(params moleculer.Payload) moleculer.Payload {
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
-	cursor, err := adapter.coll.Find(ctx, params.Bson())
+
+	query := payload.Empty()
+	if params.Get("query").Exists() {
+		query = params.Get("query")
+	}
+	query = parseSearchFields(params, query)
+
+	bs := query.Bson()
+	fmt.Println("Find() bs -> ", bs)
+	cursor, err := adapter.coll.Find(ctx, bs)
 	if err != nil {
 		return payload.Create(err)
 	}
@@ -68,7 +101,7 @@ func (adapter *MongoAdapter) Find(params moleculer.Payload) moleculer.Payload {
 }
 
 func (adapter *MongoAdapter) FindOne(params moleculer.Payload) moleculer.Payload {
-	params = payload.Add(params, map[string]interface{}{
+	params = params.AddMany(map[string]interface{}{
 		"limit": 1,
 	})
 	list := adapter.Find(params).Array()
@@ -94,9 +127,7 @@ func (adapter *MongoAdapter) Insert(params moleculer.Payload) moleculer.Payload 
 	if err != nil {
 		return payload.Error("Error while trying to insert record. Error: ", err.Error())
 	}
-	return params.Add(map[string]interface{}{
-		"id": res.InsertedID,
-	})
+	return params.Add("id", res.InsertedID)
 }
 
 func (adapter *MongoAdapter) Update(params moleculer.Payload) moleculer.Payload {
@@ -108,4 +139,13 @@ func (adapter *MongoAdapter) UpdateById(params moleculer.Payload) moleculer.Payl
 }
 func (adapter *MongoAdapter) RemoveById(params moleculer.Payload) moleculer.Payload {
 	return nil
+}
+
+func (adapter *MongoAdapter) RemoveAll() moleculer.Payload {
+	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
+	res, err := adapter.coll.DeleteMany(ctx, bson.M{})
+	if err != nil {
+		return payload.Error("Error while trying to remove all records. Error: ", err.Error())
+	}
+	return payload.Create(res.DeletedCount)
 }

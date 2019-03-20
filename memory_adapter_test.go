@@ -10,7 +10,7 @@ import (
 
 var _ = Describe("MemoryAdapter", func() {
 
-	adapter := userAdapter()
+	adapter := memoryAdapter("user", userDbSchema)
 
 	var johnTravolta moleculer.Payload
 	BeforeEach(func() {
@@ -69,6 +69,18 @@ var _ = Describe("MemoryAdapter", func() {
 		Expect(r.IsError()).Should(BeFalse())
 		Expect(r.Len()).Should(Equal(1))
 		Expect(snap.SnapshotMulti("Insert()", r.Remove("id"))).Should(Succeed())
+	})
+
+	It("RemoveAll() should remove all records and return total of removed items", func() {
+		total := adapter.Count(payload.Empty())
+		Expect(total.Int()).Should(Equal(6))
+
+		count := adapter.RemoveAll()
+		Expect(count.IsError()).Should(BeFalse())
+		Expect(count.Int()).Should(Equal(6))
+
+		total = adapter.Count(payload.Empty())
+		Expect(total.Int()).Should(Equal(0))
 	})
 
 })

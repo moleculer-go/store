@@ -33,8 +33,16 @@ func (adapter *MemoryAdapter) Disconnect() error {
 }
 
 func (adapter *MemoryAdapter) Find(params moleculer.Payload) moleculer.Payload {
-	indexName := strings.Join(params.Get("searchFields").StringArray(), "-")
-	search := params.Get("search").String()
+	searchFields := []string{"all"}
+	search := "*"
+	if params.Get("searchFields").Exists() {
+		searchFields = params.Get("searchFields").StringArray()
+	}
+	if params.Get("search").Exists() {
+		search = params.Get("search").String()
+	}
+
+	indexName := strings.Join(searchFields, "-")
 	tx := adapter.db.Txn(false)
 	defer tx.Abort()
 	results, err := tx.Get(adapter.Table, indexName, search)
@@ -65,7 +73,7 @@ func (adapter *MemoryAdapter) FindOne(params moleculer.Payload) moleculer.Payloa
 }
 
 func (adapter *MemoryAdapter) FindById(params moleculer.Payload) moleculer.Payload {
-	params = params.Add(map[string]interface{}{
+	params = params.AddMany(map[string]interface{}{
 		"searchFields": []string{"id"},
 		"search":       params.Get("id").String(),
 	})
@@ -89,8 +97,9 @@ func (adapter *MemoryAdapter) Count(params moleculer.Payload) moleculer.Payload 
 }
 
 func (adapter *MemoryAdapter) Insert(params moleculer.Payload) moleculer.Payload {
-	params = params.Add(map[string]interface{}{
-		"id": util.RandomString(12),
+	params = params.AddMany(map[string]interface{}{
+		"id":  util.RandomString(12),
+		"all": "*",
 	})
 	tx := adapter.db.Txn(true)
 	err := tx.Insert(adapter.Table, params)
@@ -111,7 +120,7 @@ func (adapter *MemoryAdapter) Update(params moleculer.Payload) moleculer.Payload
 			defer tx.Abort()
 			return payload.Error("Failed trying to update record. source error: ", err.Error())
 		}
-		rec := one.Add(params.RawMap())
+		rec := one.AddMany(params.RawMap())
 		err = tx.Insert(adapter.Table, rec)
 		if err != nil {
 			defer tx.Abort()
@@ -140,6 +149,16 @@ func (adapter *MemoryAdapter) RemoveById(params moleculer.Payload) moleculer.Pay
 		return params
 	}
 	return nil
+}
+
+func (adapter *MemoryAdapter) RemoveAll() moleculer.Payload {
+	items := adapter.Count(payload.Create(nil))
+	if items.IsError() {
+		return items
+	}
+	adapter.Disconnect()
+	adapter.Connect()
+	return items
 }
 
 type PayloadIndex struct {

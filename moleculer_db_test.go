@@ -9,36 +9,44 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func userAdapter() *MemoryAdapter {
+func memoryAdapter(table string, dbSchema *memdb.DBSchema) *MemoryAdapter {
 	return &MemoryAdapter{
-		Table: "user",
-		Schema: &memdb.DBSchema{
-			Tables: map[string]*memdb.TableSchema{
-				"user": &memdb.TableSchema{
-					Name: "user",
-					Indexes: map[string]*memdb.IndexSchema{
-						"id": &memdb.IndexSchema{
-							Name:    "id",
-							Unique:  true,
-							Indexer: &PayloadIndex{Field: "id"},
-						},
-						"name": &memdb.IndexSchema{
-							Name:    "name",
-							Unique:  false,
-							Indexer: &PayloadIndex{Field: "name"},
-						},
-					},
-				},
-			},
-		},
+		Table:  table,
+		Schema: dbSchema,
 	}
 }
 
-func connectAndLoadUsers(adapter *MemoryAdapter) (moleculer.Payload, moleculer.Payload, moleculer.Payload) {
+var userDbSchema = &memdb.DBSchema{
+	Tables: map[string]*memdb.TableSchema{
+		"user": &memdb.TableSchema{
+			Name: "user",
+			Indexes: map[string]*memdb.IndexSchema{
+				"id": &memdb.IndexSchema{
+					Name:    "id",
+					Unique:  true,
+					Indexer: &PayloadIndex{Field: "id"},
+				},
+				"name": &memdb.IndexSchema{
+					Name:    "name",
+					Unique:  false,
+					Indexer: &PayloadIndex{Field: "name"},
+				},
+				"all": &memdb.IndexSchema{
+					Name:    "all",
+					Unique:  false,
+					Indexer: &PayloadIndex{Field: "all"},
+				},
+			},
+		},
+	},
+}
+
+func connectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload, moleculer.Payload) {
 	err := adapter.Connect()
 	if err != nil {
 		panic(err)
 	}
+	adapter.RemoveAll()
 	johnSnow := adapter.Insert(payload.Create(map[string]interface{}{
 		"name":     "John",
 		"lastname": "Snow",
@@ -58,6 +66,25 @@ func connectAndLoadUsers(adapter *MemoryAdapter) (moleculer.Payload, moleculer.P
 		"lastname": "Travolta",
 		"age":      65,
 	}))
+
+	adapter.Insert(payload.Create(map[string]interface{}{
+		"name":     "Julian",
+		"lastname": "Assange",
+		"age":      46,
+	}))
+
+	adapter.Insert(payload.Create(map[string]interface{}{
+		"name":     "Peter",
+		"lastname": "Pan",
+		"age":      13,
+	}))
+
+	adapter.Insert(payload.Create(map[string]interface{}{
+		"name":     "Stone",
+		"lastname": "Man",
+		"age":      13,
+	}))
+
 	Expect(johnTravolta.IsError()).Should(BeFalse())
 	return johnSnow, marie, johnTravolta
 }
@@ -65,7 +92,7 @@ func connectAndLoadUsers(adapter *MemoryAdapter) (moleculer.Payload, moleculer.P
 var _ = Describe("Moleculer DB Mixin", func() {
 
 	Describe("list action", func() {
-		adapter := userAdapter()
+		adapter := memoryAdapter("user", userDbSchema)
 
 		//var johnSnow, marie, johnTravolta moleculer.Payload
 		BeforeEach(func() {
@@ -82,9 +109,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			ls := mx.Actions[2]
 			rs := ls.Handler(ctx.(moleculer.Context), params)
 			pl := payload.Create(rs)
-			pl = pl.Add(map[string]interface{}{
-				"rows": pl.Get("rows").Remove("id"),
-			})
+			pl = pl.Add("rows", pl.Get("rows").Remove("id"))
 			Expect(pl.Get("rows").Len()).Should(Equal(2))
 			Expect(pl.Get("page").Int()).Should(Equal(1))
 			Expect(pl.Get("pageSize").Int()).Should(Equal(10))

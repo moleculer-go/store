@@ -50,6 +50,7 @@ type Adapter interface {
 	Update(params moleculer.Payload) moleculer.Payload
 	UpdateById(params moleculer.Payload) moleculer.Payload
 	RemoveById(params moleculer.Payload) moleculer.Payload
+	RemoveAll() moleculer.Payload
 }
 
 //Service create the Mixin schema for the Moleculer DB Service.
