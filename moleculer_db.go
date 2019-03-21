@@ -101,9 +101,9 @@ func Service(adapter Adapter) moleculer.Mixin {
 					}{},
 				},
 				Handler: func(ctx moleculer.Context, params moleculer.Payload) interface{} {
-					return constrainFields(
+					return populateFields(constrainFields(
 						adapter.Find(params), params, serviceSettings["fields"].([]string),
-					)
+					), params, serviceSettings["populate"].([]string))
 				},
 			},
 
@@ -195,6 +195,12 @@ func Service(adapter Adapter) moleculer.Mixin {
 // constrainFields limits the fields in the paylod to the ondes specified in the fields settings.
 // first checks on the action, otherwise use the default.
 func constrainFields(result, params moleculer.Payload, defaultFields []string) moleculer.Payload {
+	//TODO
+	return result
+}
+
+// populateFields populate fields on the results.
+func populateFields(result, params moleculer.Payload, defaultPopulate []string) moleculer.Payload {
 	//TODO
 	return result
 }
