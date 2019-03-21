@@ -198,11 +198,7 @@ func (adapter *MongoAdapter) Find(params moleculer.Payload) moleculer.Payload {
 
 func (adapter *MongoAdapter) FindOne(params moleculer.Payload) moleculer.Payload {
 	params = params.Add("limit", 1)
-	list := adapter.Find(params).Array()
-	if len(list) == 0 {
-		return nil
-	}
-	return list[0]
+	return adapter.Find(params).First()
 }
 
 func (adapter *MongoAdapter) FindById(params moleculer.Payload) moleculer.Payload {
@@ -216,15 +212,19 @@ func (adapter *MongoAdapter) FindById(params moleculer.Payload) moleculer.Payloa
 		},
 		"limit": 1,
 	})
-	items := adapter.Find(filter)
-	if items.IsError() {
-		return items
-	}
-	return items.First()
+	return adapter.FindOne(filter)
 }
 
 func (adapter *MongoAdapter) FindByIds(params moleculer.Payload) moleculer.Payload {
-	return nil
+	if !params.IsArray() {
+		return payload.Error("FindByIds() only support lists!  --> !params.IsArray()")
+	}
+	r := payload.EmptyList()
+	params.ForEach(func(idx interface{}, id moleculer.Payload) bool {
+		r = r.AddItem(adapter.FindById(id))
+		return true
+	})
+	return r
 }
 
 // Count count the number of records for the given filter.
@@ -248,13 +248,16 @@ func (adapter *MongoAdapter) Insert(params moleculer.Payload) moleculer.Payload 
 }
 
 func (adapter *MongoAdapter) Update(params moleculer.Payload) moleculer.Payload {
+
 	return nil
 }
 
 func (adapter *MongoAdapter) UpdateById(params moleculer.Payload) moleculer.Payload {
+
 	return nil
 }
 func (adapter *MongoAdapter) RemoveById(params moleculer.Payload) moleculer.Payload {
+
 	return nil
 }
 

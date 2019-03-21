@@ -27,9 +27,9 @@ type M map[string]interface{}
 var _ = Describe("Mongo Adapter", func() {
 	adapter := mongoAdapter("mongo_adapter_tests", "user")
 	totalRecords := 6
-	var johnSnow, marie moleculer.Payload
+	var johnSnow, marie, johnTravolta moleculer.Payload
 	BeforeEach(func() {
-		johnSnow, marie, _ = connectAndLoadUsers(adapter)
+		johnSnow, marie, johnTravolta = connectAndLoadUsers(adapter)
 	})
 
 	AfterEach(func() {
@@ -173,6 +173,46 @@ var _ = Describe("Mongo Adapter", func() {
 			Expect(result.Get("name").String()).Should(Equal(marie.Get("name").String()))
 			Expect(result.Get("lastname").String()).Should(Equal(marie.Get("lastname").String()))
 			Expect(result.Get("age").Int()).Should(Equal(marie.Get("age").Int()))
+		})
+	})
+
+	Describe("FindOne", func() {
+		It("should find one a records at a time", func() {
+			result := adapter.FindOne(payload.New(M{
+				"query": M{
+					"age": M{
+						"$gt": 60,
+					},
+				},
+				"sort": "name",
+			}))
+			Expect(result.Exists()).Should(BeTrue())
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Get("name").String()).Should(Equal("John"))
+
+			result = adapter.FindOne(payload.New(M{
+				"query": M{
+					"age": M{
+						"$lt": 20,
+					},
+				},
+				"sort": "name",
+			}))
+			Expect(result.Exists()).Should(BeTrue())
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Get("name").String()).Should(Equal("Peter"))
+		})
+	})
+
+	Describe("FindByIds", func() {
+		It("should find multiple records", func() {
+			result := adapter.FindByIds(payload.EmptyList().AddItem(johnSnow.Get("_id")).AddItem(marie.Get("_id")).AddItem(johnTravolta.Get("_id")))
+			Expect(result.Exists()).Should(BeTrue())
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Array()[0].Get("name").String()).Should(Equal("John"))
+			Expect(result.Array()[1].Get("name").String()).Should(Equal("Marie"))
+			Expect(result.Array()[2].Get("name").String()).Should(Equal("John"))
+
 		})
 	})
 
