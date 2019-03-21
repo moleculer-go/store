@@ -48,8 +48,8 @@ type Adapter interface {
 	Count(params moleculer.Payload) moleculer.Payload
 	Insert(params moleculer.Payload) moleculer.Payload
 	Update(params moleculer.Payload) moleculer.Payload
-	UpdateById(params moleculer.Payload) moleculer.Payload
-	RemoveById(params moleculer.Payload) moleculer.Payload
+	UpdateById(id, update moleculer.Payload) moleculer.Payload
+	RemoveById(id moleculer.Payload) moleculer.Payload
 	RemoveAll() moleculer.Payload
 }
 

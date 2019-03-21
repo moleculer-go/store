@@ -216,4 +216,74 @@ var _ = Describe("Mongo Adapter", func() {
 		})
 	})
 
+	Describe("Removes", func() {
+		It("RemoveById should removed a record using a specific ID", func() {
+			result := adapter.RemoveById(johnSnow.Get("_id"))
+			Expect(result.Exists()).Should(BeTrue())
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Get("deletedCount").Int()).Should(Equal(1))
+
+			result = adapter.Find(payload.New(M{}))
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Len()).Should(Equal(totalRecords - 1))
+		})
+
+		It("RemoveAll should removed all records", func() {
+			result := adapter.RemoveAll()
+			Expect(result.Exists()).Should(BeTrue())
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Get("deletedCount").Int()).Should(Equal(6))
+
+			result = adapter.Find(payload.New(M{}))
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Len()).Should(Equal(0))
+		})
+	})
+
+	Describe("Updates", func() {
+
+		It("Update should update record", func() {
+			result := adapter.Update(payload.Empty().AddMany(M{
+				"_id":      johnSnow.Get("_id").String(),
+				"age":      175,
+				"lastname": "Cruzader",
+				"house":    "Spark",
+			}))
+			Expect(result.Exists()).Should(BeTrue())
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Get("modifiedCount").Int()).Should(Equal(1))
+
+			result = adapter.FindById(johnSnow.Get("_id"))
+			Expect(result.Get("age").Int()).Should(Equal(175))
+			Expect(result.Get("lastname").String()).Should(Equal("Cruzader"))
+			Expect(result.Get("house").String()).Should(Equal("Spark"))
+		})
+
+		It("UpdateById should update record", func() {
+			result := adapter.UpdateById(johnSnow.Get("_id"), payload.Empty().Add("$set", M{
+				"age": 120,
+			}))
+			Expect(result.Exists()).Should(BeTrue())
+			Expect(result.IsError()).Should(BeFalse())
+			Expect(result.Get("modifiedCount").Int()).Should(Equal(1))
+
+			result = adapter.UpdateById(marie.Get("_id"), payload.Empty().Add("$set", M{
+				"lastname": "Vai com as outras",
+				"age":      320,
+				"newField": "newValue",
+			}))
+			Expect(result.Exists()).Should(BeTrue())
+			Expect(result.IsError()).Should(BeFalse())
+
+			result = adapter.FindById(marie.Get("_id"))
+			Expect(result.Get("age").Int()).Should(Equal(320))
+			Expect(result.Get("lastname").String()).Should(Equal("Vai com as outras"))
+			Expect(result.Get("newField").String()).Should(Equal("newValue"))
+
+			result = adapter.FindById(johnSnow.Get("_id"))
+			Expect(result.Get("age").Int()).Should(Equal(120))
+
+		})
+	})
+
 })

@@ -132,8 +132,8 @@ func (adapter *MemoryAdapter) Update(params moleculer.Payload) moleculer.Payload
 	return payload.Error("Failed trying to update record. Could not find record with id: ", params.Get("id").String())
 }
 
-func (adapter *MemoryAdapter) UpdateById(params moleculer.Payload) moleculer.Payload {
-	return adapter.Update(params)
+func (adapter *MemoryAdapter) UpdateById(id, params moleculer.Payload) moleculer.Payload {
+	return adapter.Update(params.Add("id", id))
 }
 
 func (adapter *MemoryAdapter) RemoveById(params moleculer.Payload) moleculer.Payload {

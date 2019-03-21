@@ -248,17 +248,38 @@ func (adapter *MongoAdapter) Insert(params moleculer.Payload) moleculer.Payload 
 }
 
 func (adapter *MongoAdapter) Update(params moleculer.Payload) moleculer.Payload {
-
-	return nil
+	id := params.Get("_id")
+	if !id.Exists() {
+		return payload.Error("Cannot update record without _id")
+	}
+	return adapter.UpdateById(id, payload.Empty().Add("$set", params.Remove("_id")))
 }
 
-func (adapter *MongoAdapter) UpdateById(params moleculer.Payload) moleculer.Payload {
+func (adapter *MongoAdapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
+	hexid, err := primitive.ObjectIDFromHex(id.String())
+	if err != nil {
+		return payload.Error("Cannot update record without _id - error: ", err)
+	}
 
-	return nil
+	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
+	ur, uerr := adapter.coll.UpdateOne(ctx, bson.M{"_id": hexid}, update.Bson())
+	if uerr != nil {
+		return payload.Error("Cannot update record - error: ", uerr)
+	}
+	return payload.Empty().Add("modifiedCount", ur.ModifiedCount).Add("matchedCount", ur.MatchedCount)
 }
-func (adapter *MongoAdapter) RemoveById(params moleculer.Payload) moleculer.Payload {
 
-	return nil
+func (adapter *MongoAdapter) RemoveById(id moleculer.Payload) moleculer.Payload {
+	hexid, err := primitive.ObjectIDFromHex(id.String())
+	if err != nil {
+		return payload.Error("Cannot update record without _id - error: ", err)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
+	dr, uerr := adapter.coll.DeleteOne(ctx, bson.M{"_id": hexid})
+	if uerr != nil {
+		return payload.Error("Cannot update record - error: ", uerr)
+	}
+	return payload.Empty().Add("deletedCount", dr.DeletedCount)
 }
 
 func (adapter *MongoAdapter) RemoveAll() moleculer.Payload {
@@ -267,5 +288,5 @@ func (adapter *MongoAdapter) RemoveAll() moleculer.Payload {
 	if err != nil {
 		return payload.Error("Error while trying to remove all records. Error: ", err.Error())
 	}
-	return payload.New(res.DeletedCount)
+	return payload.Empty().Add("deletedCount", res.DeletedCount)
 }
