@@ -23,7 +23,7 @@ var _ = Describe("MemoryAdapter", func() {
 	})
 
 	It("Find() should return matching records", func() {
-		r := adapter.Find(payload.Create(map[string]interface{}{
+		r := adapter.Find(payload.New(map[string]interface{}{
 			"searchFields": []string{"name"},
 			"search":       "John",
 		}))
@@ -33,7 +33,7 @@ var _ = Describe("MemoryAdapter", func() {
 	})
 
 	It("Count() should return matching records", func() {
-		r := adapter.Count(payload.Create(map[string]interface{}{
+		r := adapter.Count(payload.New(map[string]interface{}{
 			"searchFields": []string{"name"},
 			"search":       "John",
 		}))
@@ -43,7 +43,7 @@ var _ = Describe("MemoryAdapter", func() {
 	})
 
 	It("Update() should update existing record matching records", func() {
-		r := adapter.Update(payload.Create(map[string]interface{}{
+		r := adapter.Update(payload.New(map[string]interface{}{
 			"id":  johnTravolta.Get("id").String(),
 			"age": 67,
 		}))
@@ -54,7 +54,7 @@ var _ = Describe("MemoryAdapter", func() {
 	})
 
 	It("Insert() should insert new records", func() {
-		r := adapter.Insert(payload.Create(map[string]interface{}{
+		r := adapter.Insert(payload.New(map[string]interface{}{
 			"name":     "Julio",
 			"lastname": "Cesar",
 		}))
@@ -62,7 +62,7 @@ var _ = Describe("MemoryAdapter", func() {
 		Expect(r.Get("name").String()).Should(Equal("Julio"))
 		Expect(r.Get("lastname").String()).Should(Equal("Cesar"))
 
-		r = adapter.Find(payload.Create(map[string]interface{}{
+		r = adapter.Find(payload.New(map[string]interface{}{
 			"searchFields": []string{"name"},
 			"search":       "Julio",
 		}))

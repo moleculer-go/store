@@ -55,9 +55,9 @@ func (adapter *MemoryAdapter) Find(params moleculer.Payload) moleculer.Payload {
 		if value == nil {
 			break
 		}
-		items = append(items, payload.Create(value))
+		items = append(items, payload.New(value))
 	}
-	return payload.Create(items)
+	return payload.New(items)
 }
 
 func (adapter *MemoryAdapter) FindOne(params moleculer.Payload) moleculer.Payload {
@@ -69,7 +69,7 @@ func (adapter *MemoryAdapter) FindOne(params moleculer.Payload) moleculer.Payloa
 	if err != nil {
 		return payload.Error("Failed trying to find. Error: ", err.Error())
 	}
-	return payload.Create(result)
+	return payload.New(result)
 }
 
 func (adapter *MemoryAdapter) FindById(params moleculer.Payload) moleculer.Payload {
@@ -84,16 +84,16 @@ func (adapter *MemoryAdapter) FindByIds(params moleculer.Payload) moleculer.Payl
 	ids := params.Get("ids").StringArray()
 	list := []moleculer.Payload{}
 	for id := range ids {
-		list = append(list, adapter.FindById(payload.Create(map[string]interface{}{
+		list = append(list, adapter.FindById(payload.New(map[string]interface{}{
 			"id": id,
 		})))
 	}
-	return payload.Create(list)
+	return payload.New(list)
 }
 
 func (adapter *MemoryAdapter) Count(params moleculer.Payload) moleculer.Payload {
 	result := adapter.Find(params)
-	return payload.Create(result.Len())
+	return payload.New(result.Len())
 }
 
 func (adapter *MemoryAdapter) Insert(params moleculer.Payload) moleculer.Payload {
@@ -152,7 +152,7 @@ func (adapter *MemoryAdapter) RemoveById(params moleculer.Payload) moleculer.Pay
 }
 
 func (adapter *MemoryAdapter) RemoveAll() moleculer.Payload {
-	items := adapter.Count(payload.Create(nil))
+	items := adapter.Count(payload.New(nil))
 	if items.IsError() {
 		return items
 	}
@@ -192,7 +192,7 @@ func (s *PayloadIndex) FromObject(obj interface{}) (bool, []byte, error) {
 		return false, nil, errors.New("Invalid type. It must be moleculer.Payload!")
 	}
 	if isMap {
-		p = payload.Create(m)
+		p = payload.New(m)
 	}
 	if !p.Get(s.Field).Exists() {
 		fmt.Println("obj --> ", obj)

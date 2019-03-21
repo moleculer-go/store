@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"time"
 
 	snap "github.com/moleculer-go/cupaloy"
@@ -39,13 +38,13 @@ var _ = Describe("Mongo Adapter", func() {
 
 	Describe("Count", func() {
 		It("should count the number of records properly", func() {
-			result := adapter.Count(payload.Create(M{}))
+			result := adapter.Count(payload.New(M{}))
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Int()).Should(Equal(totalRecords))
 		})
 
 		It("should count the number of records and apply filter", func() {
-			result := adapter.Count(payload.Create(M{"query": M{
+			result := adapter.Count(payload.New(M{"query": M{
 				"name": "John",
 			}}))
 			Expect(result.IsError()).Should(BeFalse())
@@ -57,14 +56,14 @@ var _ = Describe("Mongo Adapter", func() {
 	Describe("Find", func() {
 
 		It("should find using an empty query and return all records", func() {
-			result := adapter.Find(payload.Create(M{}))
+			result := adapter.Find(payload.New(M{}))
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Len()).Should(Equal(totalRecords))
 		})
 
 		//Sort apprently not working in this client
 		XIt("should sort the results", func() {
-			result := adapter.Find(payload.Create(M{
+			result := adapter.Find(payload.New(M{
 				"query": M{},
 				"sort":  "name",
 			}))
@@ -72,7 +71,7 @@ var _ = Describe("Mongo Adapter", func() {
 			Expect(result.Len()).Should(Equal(totalRecords))
 			Expect(snap.SnapshotMulti("sort-1", result.Remove("_id"))).Should(Succeed())
 
-			result2 := adapter.Find(payload.Create(M{
+			result2 := adapter.Find(payload.New(M{
 				"query": M{},
 				"sort":  "age",
 			}))
@@ -86,7 +85,7 @@ var _ = Describe("Mongo Adapter", func() {
 		})
 
 		It("should offset the results", func() {
-			result := adapter.Find(payload.Create(M{
+			result := adapter.Find(payload.New(M{
 				"query":  M{},
 				"sort":   "name",
 				"offset": 2,
@@ -95,7 +94,7 @@ var _ = Describe("Mongo Adapter", func() {
 			Expect(result.Len()).Should(Equal(totalRecords - 2))
 			Expect(snap.SnapshotMulti("offset-2", result.Remove("_id"))).Should(Succeed())
 
-			result = adapter.Find(payload.Create(M{
+			result = adapter.Find(payload.New(M{
 				"query":  M{},
 				"sort":   "name",
 				"offset": 4,
@@ -110,7 +109,7 @@ var _ = Describe("Mongo Adapter", func() {
 				"query": M{},
 				"limit": 3,
 			}
-			p := payload.Create(query)
+			p := payload.New(query)
 			r := adapter.Find(p)
 
 			Expect(r.IsError()).Should(BeFalse())
@@ -119,7 +118,7 @@ var _ = Describe("Mongo Adapter", func() {
 
 		It("should search using search/searchFields params", func() {
 
-			p := payload.Create(map[string]interface{}{
+			p := payload.New(map[string]interface{}{
 				"search":       "John",
 				"searchFields": []string{"name", "midlename"},
 			})
@@ -137,7 +136,7 @@ var _ = Describe("Mongo Adapter", func() {
 					},
 				},
 			}
-			p := payload.Create(query)
+			p := payload.New(query)
 			r := adapter.Find(p)
 
 			Expect(r.IsError()).Should(BeFalse())
@@ -151,7 +150,7 @@ var _ = Describe("Mongo Adapter", func() {
 					},
 				},
 			}
-			p = payload.Create(query)
+			p = payload.New(query)
 			r = adapter.Find(p)
 
 			Expect(r.IsError()).Should(BeFalse())
@@ -162,18 +161,14 @@ var _ = Describe("Mongo Adapter", func() {
 
 	Describe("FindById", func() {
 		It("should find a records by its ID", func() {
-			fmt.Println("johnSnow --> ", johnSnow)
 			result := adapter.FindById(johnSnow.Get("_id"))
-			fmt.Println("result1 --> ", result)
 			Expect(result.Exists()).Should(BeTrue())
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Get("name").String()).Should(Equal(johnSnow.Get("name").String()))
 			Expect(result.Get("lastname").String()).Should(Equal(johnSnow.Get("lastname").String()))
 			Expect(result.Get("age").Int()).Should(Equal(johnSnow.Get("age").Int()))
 
-			fmt.Println("marie --> ", marie)
 			result = adapter.FindById(marie.Get("_id"))
-			fmt.Println("result2 --> ", result)
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Get("name").String()).Should(Equal(marie.Get("name").String()))
 			Expect(result.Get("lastname").String()).Should(Equal(marie.Get("lastname").String()))

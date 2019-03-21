@@ -47,39 +47,39 @@ func connectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload,
 		panic(err)
 	}
 	adapter.RemoveAll()
-	johnSnow := adapter.Insert(payload.Create(map[string]interface{}{
+	johnSnow := adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "John",
 		"lastname": "Snow",
 		"age":      25,
 	}))
 	Expect(johnSnow.IsError()).Should(BeFalse())
 
-	marie := adapter.Insert(payload.Create(map[string]interface{}{
+	marie := adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "Marie",
 		"lastname": "Claire",
 		"age":      75,
 	}))
 	Expect(marie.IsError()).Should(BeFalse())
 
-	johnTravolta := adapter.Insert(payload.Create(map[string]interface{}{
+	johnTravolta := adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "John",
 		"lastname": "Travolta",
 		"age":      65,
 	}))
 
-	adapter.Insert(payload.Create(map[string]interface{}{
+	adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "Julian",
 		"lastname": "Assange",
 		"age":      46,
 	}))
 
-	adapter.Insert(payload.Create(map[string]interface{}{
+	adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "Peter",
 		"lastname": "Pan",
 		"age":      13,
 	}))
 
-	adapter.Insert(payload.Create(map[string]interface{}{
+	adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "Stone",
 		"lastname": "Man",
 		"age":      13,
@@ -101,14 +101,14 @@ var _ = Describe("Moleculer DB Mixin", func() {
 
 		ctx, _ := test.ContextAndDelegated("list-test", moleculer.BrokerConfig{})
 		It("should return page, pageSize, rows, total and totalPages", func() {
-			params := payload.Create(map[string]interface{}{
+			params := payload.New(map[string]interface{}{
 				"searchFields": []string{"name"},
 				"search":       "John",
 			})
 			mx := Service(adapter)
 			ls := mx.Actions[2]
 			rs := ls.Handler(ctx.(moleculer.Context), params)
-			pl := payload.Create(rs)
+			pl := payload.New(rs)
 			pl = pl.Add("rows", pl.Get("rows").Remove("id"))
 			Expect(pl.Get("rows").Len()).Should(Equal(2))
 			Expect(pl.Get("page").Int()).Should(Equal(1))

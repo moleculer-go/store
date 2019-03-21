@@ -10,6 +10,7 @@ import (
 
 	"github.com/moleculer-go/moleculer"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -95,19 +96,19 @@ func parseFindOptions(params moleculer.Payload) *options.FindOptions {
 	return &opts
 }
 
-func sortEntry(entry string) bson.E {
-	item := bson.E{entry, 1}
+func sortEntry(entry string) primitive.E {
+	item := primitive.E{entry, 1}
 	if strings.Index(entry, "-") == 0 {
 		entry = strings.Replace(entry, "-", "", 1)
-		item = bson.E{entry, -1}
+		item = primitive.E{entry, -1}
 	}
 	return item
 }
 
-func sortsFromString(sort moleculer.Payload) bson.D {
+func sortsFromString(sort moleculer.Payload) primitive.D {
 	parts := strings.Split(strings.Trim(sort.String(), " "), " ")
 	if len(parts) > 1 {
-		sorts := bson.D{}
+		sorts := primitive.D{}
 		for _, value := range parts {
 			item := sortEntry(value)
 			sorts = append(sorts, item)
@@ -151,30 +152,48 @@ func (adapter *MongoAdapter) openCursor(params moleculer.Payload) (*mongo.Cursor
 	return cursor, ctx, nil
 }
 
-func cursorToPayload(ctx context.Context, cursor *mongo.Cursor) moleculer.Payload {
+func applyTransforms(value bson.M, transforms ...func(bson.M) bson.M) bson.M {
+	for _, transform := range transforms {
+		value = transform(value)
+	}
+	return value
+}
+
+// cursorToPayload iterates throught a cursor and populate a list of payloads.
+func cursorToPayload(ctx context.Context, cursor *mongo.Cursor, transform ...func(bson.M) bson.M) moleculer.Payload {
 	list := []moleculer.Payload{}
 	for cursor.Next(ctx) {
-		var result bson.M
-		err := cursor.Decode(&result)
+		var item bson.M
+		err := cursor.Decode(&item)
 		if err != nil {
-			return payload.Create(err)
+			return payload.New(err)
 		}
-		list = append(list, payload.Create(result))
+		transformed := applyTransforms(item, transform...)
+		list = append(list, payload.New(transformed))
 	}
 	if err := cursor.Err(); err != nil {
-		return payload.Create(err)
+		return payload.New(err)
 	}
-	return payload.Create(list)
+	return payload.New(list)
+}
+
+// idTransform transform id from primitive.ObjectID to string
+func idTransform(bm bson.M) bson.M {
+	id, hasId := bm["_id"]
+	if hasId {
+		bm["_id"] = id.(primitive.ObjectID).Hex()
+	}
+	return bm
 }
 
 // Find search the data store with the params provided.
 func (adapter *MongoAdapter) Find(params moleculer.Payload) moleculer.Payload {
 	cursor, ctx, err := adapter.openCursor(params)
 	if err != nil {
-		return payload.Create(err)
+		return payload.New(err)
 	}
 	defer cursor.Close(ctx)
-	return cursorToPayload(ctx, cursor)
+	return cursorToPayload(ctx, cursor, idTransform)
 }
 
 func (adapter *MongoAdapter) FindOne(params moleculer.Payload) moleculer.Payload {
@@ -185,23 +204,25 @@ func (adapter *MongoAdapter) FindOne(params moleculer.Payload) moleculer.Payload
 	}
 	return list[0]
 }
+
 func (adapter *MongoAdapter) FindById(params moleculer.Payload) moleculer.Payload {
-	id := params.Value()
-	//maybe I need to convert the id value here.
-	filter := payload.Create(bson.M{
+	id, err := primitive.ObjectIDFromHex(params.String())
+	if err != nil {
+		return payload.Error("Invalid id error: ", err)
+	}
+	filter := payload.New(bson.M{
 		"query": bson.M{
 			"_id": id,
 		},
 		"limit": 1,
 	})
-	fmt.Println("filter --> ", filter)
 	items := adapter.Find(filter)
-	fmt.Println("items --> ", items)
 	if items.IsError() {
 		return items
 	}
 	return items.First()
 }
+
 func (adapter *MongoAdapter) FindByIds(params moleculer.Payload) moleculer.Payload {
 	return nil
 }
@@ -212,9 +233,9 @@ func (adapter *MongoAdapter) Count(params moleculer.Payload) moleculer.Payload {
 	filter := parseFilter(params)
 	count, err := adapter.coll.CountDocuments(ctx, filter)
 	if err != nil {
-		return payload.Create(err)
+		return payload.New(err)
 	}
-	return payload.Create(count)
+	return payload.New(count)
 }
 
 func (adapter *MongoAdapter) Insert(params moleculer.Payload) moleculer.Payload {
@@ -223,7 +244,7 @@ func (adapter *MongoAdapter) Insert(params moleculer.Payload) moleculer.Payload 
 	if err != nil {
 		return payload.Error("Error while trying to insert record. Error: ", err.Error())
 	}
-	return params.Add("id", res.InsertedID)
+	return params.Add("_id", res.InsertedID.(primitive.ObjectID).Hex())
 }
 
 func (adapter *MongoAdapter) Update(params moleculer.Payload) moleculer.Payload {
@@ -243,5 +264,5 @@ func (adapter *MongoAdapter) RemoveAll() moleculer.Payload {
 	if err != nil {
 		return payload.Error("Error while trying to remove all records. Error: ", err.Error())
 	}
-	return payload.Create(res.DeletedCount)
+	return payload.New(res.DeletedCount)
 }
