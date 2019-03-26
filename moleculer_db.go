@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"math"
 	"sync"
 
@@ -284,9 +283,7 @@ func constrainFields(result, params moleculer.Payload, fields []string) molecule
 // first checks on the action param fields, otherwise use the default from the settings.
 func constrainFieldsSingleRecords(item moleculer.Payload, fields []string) moleculer.Payload {
 	filtered := map[string]interface{}{}
-	fmt.Println("item ", item)
 	item.ForEach(func(field interface{}, value moleculer.Payload) bool {
-		fmt.Println("value ", value)
 		if contains(fields, field.(string)) {
 			filtered[field.(string)] = value.Value()
 		}

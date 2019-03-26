@@ -83,7 +83,7 @@ func (adapter *MemoryAdapter) FindById(params moleculer.Payload) moleculer.Paylo
 func (adapter *MemoryAdapter) FindByIds(params moleculer.Payload) moleculer.Payload {
 	ids := params.StringArray()
 	list := []moleculer.Payload{}
-	for id := range ids {
+	for _, id := range ids {
 		list = append(list, adapter.FindById(payload.New(id)))
 	}
 	return payload.New(list)
@@ -193,7 +193,6 @@ func (s *PayloadIndex) FromObject(obj interface{}) (bool, []byte, error) {
 		p = payload.New(m)
 	}
 	if !p.Get(s.Field).Exists() {
-		fmt.Println("obj --> ", obj)
 		return false, nil, errors.New(fmt.Sprint("Field `", s.Field, "` not found!"))
 	}
 	svalue := p.Get(s.Field).String()

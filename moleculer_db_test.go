@@ -388,7 +388,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 		})
 	})
 
-	FDescribe("get action", func() {
+	Describe("get action", func() {
 		adapter := memoryAdapter("user", userDbSchema)
 		var johnSnow, maria moleculer.Payload
 		BeforeEach(func() {
@@ -421,7 +421,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			Expect(rs.Get("age").String()).Should(Equal(johnSnow.Get("age").String()))
 		})
 
-		FIt("should get multiple records by id", func() {
+		It("should get multiple records by id", func() {
 			params := payload.New(map[string]interface{}{
 				"ids": []string{johnSnow.Get("id").String(), maria.Get("id").String()},
 			})
