@@ -1,8 +1,11 @@
 package db
 
 import (
+	"fmt"
 	"math"
 	"sync"
+
+	"github.com/moleculer-go/moleculer/payload"
 
 	"github.com/moleculer-go/moleculer"
 	log "github.com/sirupsen/logrus"
@@ -20,7 +23,7 @@ var defaultSettings = map[string]interface{}{
 	"fields": []string{"**"},
 
 	//populates : Schema for population. [Read more](#populating).
-	"populates": []interface{}{},
+	"populates": map[string]interface{}{},
 
 	//pageSize : Default page size in `list` action.
 	"pageSize": pageSize,
@@ -53,6 +56,82 @@ type Adapter interface {
 	RemoveAll() moleculer.Payload
 }
 
+// settingsDefaults extract defauylt settings values for fields and populates
+func settingsDefaults(settings map[string]interface{}) (fields []string, populates map[string]interface{}) {
+	fields, hasFields := settings["fields"].([]string)
+	if !hasFields {
+		fields = []string{"**"}
+	}
+	populates, hasPopulates := settings["populates"].(map[string]interface{})
+	if !hasPopulates {
+		populates = map[string]interface{}{}
+	}
+	return fields, populates
+}
+
+// findAction
+func findAction(adapter Adapter, settings map[string]interface{}) moleculer.ActionHandler {
+	fields, populates := settingsDefaults(settings)
+	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
+		return populateFields(ctx, constrainFields(
+			adapter.Find(params), params, fields,
+		), params, populates)
+	}
+}
+
+func listAction(adapter Adapter, serviceSettings map[string]interface{}) moleculer.ActionHandler {
+	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
+		var rows moleculer.Payload
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			rows = adapter.Find(params)
+			wg.Done()
+		}()
+		total := adapter.Count(params)
+		wg.Wait()
+
+		pageSize := serviceSettings["pageSize"].(int)
+		if params.Get("pageSize").Exists() {
+			pageSize = params.Get("pageSize").Int()
+		}
+		page := 1
+		if params.Get("page").Exists() {
+			page = params.Get("page").Int()
+		}
+
+		totalPages := math.Floor(
+			(total.Float() + float64(pageSize) - 1.0) / float64(pageSize))
+
+		return map[string]interface{}{
+			"rows":       rows,
+			"total":      total,
+			"page":       page,
+			"pageSize":   pageSize,
+			"totalPages": totalPages,
+		}
+	}
+}
+
+// getAction
+func getAction(adapter Adapter, settings map[string]interface{}) moleculer.ActionHandler {
+	fields, populates := settingsDefaults(settings)
+	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
+		var result moleculer.Payload
+		if params.Get("ids").Len() == 1 {
+			result = adapter.FindById(params.Get("ids").First())
+		} else if params.Get("ids").Len() > 1 {
+			result = adapter.FindByIds(params.Get("ids"))
+		}
+		if result.IsError() {
+			return result
+		}
+		return populateFields(ctx, constrainFields(
+			result, params, fields,
+		), params, populates)
+	}
+}
+
 //Service create the Mixin schema for the Moleculer DB Service.
 func Service(adapter Adapter) moleculer.Mixin {
 	serviceSettings := defaultSettings
@@ -74,7 +153,6 @@ func Service(adapter Adapter) moleculer.Mixin {
 			}
 			context.Logger().Debug("db-mixin started. adapter from settings!")
 			adapter = settingsAdapter.(Adapter)
-
 		},
 		Stopped: func(context moleculer.BrokerContext, svc moleculer.Service) {
 
@@ -100,11 +178,7 @@ func Service(adapter Adapter) moleculer.Mixin {
 						query        map[string]interface{} `optional:"true"`
 					}{},
 				},
-				Handler: func(ctx moleculer.Context, params moleculer.Payload) interface{} {
-					return populateFields(constrainFields(
-						adapter.Find(params), params, serviceSettings["fields"].([]string),
-					), params, serviceSettings["populate"].([]string))
-				},
+				Handler: findAction(adapter, serviceSettings),
 			},
 
 			//count action
@@ -147,37 +221,26 @@ func Service(adapter Adapter) moleculer.Mixin {
 						query        map[string]interface{} `optional:"true"`
 					}{},
 				},
-				Handler: func(ctx moleculer.Context, params moleculer.Payload) interface{} {
-					var rows moleculer.Payload
-					wg := sync.WaitGroup{}
-					wg.Add(1)
-					go func() {
-						rows = adapter.Find(params)
-						wg.Done()
-					}()
-					total := adapter.Count(params)
-					wg.Wait()
+				Handler: listAction(adapter, serviceSettings),
+			},
 
-					pageSize := serviceSettings["pageSize"].(int)
-					if params.Get("pageSize").Exists() {
-						pageSize = params.Get("pageSize").Int()
-					}
-					page := 1
-					if params.Get("page").Exists() {
-						page = params.Get("page").Int()
-					}
-
-					totalPages := math.Floor(
-						(total.Float() + float64(pageSize) - 1.0) / float64(pageSize))
-
-					return map[string]interface{}{
-						"rows":       rows,
-						"total":      total,
-						"page":       page,
-						"pageSize":   pageSize,
-						"totalPages": totalPages,
-					}
+			//get action
+			{
+				Name: "get",
+				Settings: map[string]interface{}{
+					"cache": map[string]interface{}{
+						"keys": []string{"populate", "fields", "id", "mapping"},
+					},
 				},
+				Schema: moleculer.ObjectSchema{
+					struct {
+						populate []string `optional:"true"`
+						fields   []string `optional:"true"`
+						ids      []string
+						mapping  bool `optional:"true"`
+					}{},
+				},
+				Handler: getAction(adapter, serviceSettings),
 			},
 
 			//create action
@@ -192,15 +255,146 @@ func Service(adapter Adapter) moleculer.Mixin {
 	}
 }
 
-// constrainFields limits the fields in the paylod to the ondes specified in the fields settings.
-// first checks on the action, otherwise use the default.
-func constrainFields(result, params moleculer.Payload, defaultFields []string) moleculer.Payload {
-	//TODO
-	return result
+func contains(search []string, item string) bool {
+	for _, sitem := range search {
+		if item == sitem || sitem == "**" {
+			return true
+		}
+	}
+	return false
+}
+
+func constrainFields(result, params moleculer.Payload, fields []string) moleculer.Payload {
+	if params.Get("fields").Exists() && params.Get("fields").IsArray() {
+		fields = params.Get("fields").StringArray()
+	}
+	if result.IsArray() {
+		list := []moleculer.Payload{}
+		result.ForEach(func(index interface{}, item moleculer.Payload) bool {
+			list = append(list, constrainFieldsSingleRecords(item, fields))
+			return true
+		})
+		return payload.New(list)
+	} else {
+		return constrainFieldsSingleRecords(result, fields)
+	}
+}
+
+// constrainFields limits the fields in the paylod to the ones specified in the fields settings.
+// first checks on the action param fields, otherwise use the default from the settings.
+func constrainFieldsSingleRecords(item moleculer.Payload, fields []string) moleculer.Payload {
+	filtered := map[string]interface{}{}
+	fmt.Println("item ", item)
+	item.ForEach(func(field interface{}, value moleculer.Payload) bool {
+		fmt.Println("value ", value)
+		if contains(fields, field.(string)) {
+			filtered[field.(string)] = value.Value()
+		}
+		return true
+	})
+	return payload.New(filtered)
+}
+
+// actionParamsFromPopulate extracts the action params from the populates config
+func actionParamsFromPopulate(config interface{}) moleculer.Payload {
+	pconfig := payload.New(config)
+	if pconfig.IsMap() && pconfig.Get("params").Exists() {
+		return pconfig.Get("params")
+	}
+	return payload.Empty()
+}
+
+// actionFromPopulate extracts the action name from the populates config
+func actionFromPopulate(config interface{}) string {
+	pconfig := payload.New(config)
+	if pconfig.IsMap() && pconfig.Get("action").Exists() {
+		return pconfig.Get("action").String()
+	}
+	return pconfig.String()
+}
+
+// addFieldValues add params to from the parent record, to filter the child records.
+func addFieldValues(params, item moleculer.Payload, field string) moleculer.Payload {
+	fvalue := item.Get(field)
+	if fvalue.IsArray() {
+		return params.Add("id", fvalue.StringArray())
+	}
+	return params.Add("id", fvalue.String())
+}
+
+// createPopulateCall add populates call to mcalls params for a given item.
+func createPopulateCall(calls map[string]map[string]interface{}, item moleculer.Payload, populates map[string]interface{}) {
+	id := item.Get("id").String()
+	for field, config := range populates {
+		action := actionFromPopulate(config)
+		if action == "" {
+			continue
+		}
+		mcallName := id + "_" + field + "_" + action
+		actionParams := actionParamsFromPopulate(config)
+		actionParams = addFieldValues(actionParams, item, field)
+		calls[mcallName] = map[string]interface{}{
+			"action": action,
+			"params": actionParams,
+		}
+	}
+}
+
+//scenarios
+//list of ids
+// user.friends = ["id_1", "id_2", "id_3"]
+//by the id of the owner
+// user.id is the filter
+// user.comments -> loaded from the comments service. comments.byUserId
+// if is a list of users.. then collect all ids and make a single call.
+func createPopulateMCalls(result, params moleculer.Payload, populates map[string]interface{}) map[string]map[string]interface{} {
+	if params.Get("populates").Exists() && params.Get("populates").IsMap() {
+		populates = params.Get("populates").RawMap()
+	}
+	calls := map[string]map[string]interface{}{}
+	if result.IsArray() {
+		result.ForEach(func(_ interface{}, item moleculer.Payload) bool {
+			createPopulateCall(calls, item, populates)
+			return true
+		})
+	} else {
+		createPopulateCall(calls, result, populates)
+	}
+	return calls
+}
+
+// populateSingleRecordWithResults populate a single record with the populate values from the Mcall result.
+func populateSingleRecordWithResults(populates map[string]interface{}, item moleculer.Payload, mcalls map[string]moleculer.Payload) moleculer.Payload {
+	id := item.Get("id").String()
+	for field, config := range populates {
+		action := actionFromPopulate(config)
+		if action == "" {
+			continue
+		}
+		mcallName := id + "_" + field + "_" + action
+		populateResult := mcalls[mcallName]
+		item = item.Add(field, populateResult)
+	}
+	return item
+}
+
+// populateRecordsWithResults populate one record or multiple with the populatye values from the Mcall result.
+func populateRecordsWithResults(populates map[string]interface{}, result moleculer.Payload, mcalls map[string]moleculer.Payload) moleculer.Payload {
+	if result.IsArray() {
+		list := []moleculer.Payload{}
+		result.ForEach(func(index interface{}, item moleculer.Payload) bool {
+			list = append(list, populateSingleRecordWithResults(populates, item, mcalls))
+			return true
+		})
+		return payload.New(list)
+	} else {
+		return populateSingleRecordWithResults(populates, result, mcalls)
+	}
 }
 
 // populateFields populate fields on the results.
-func populateFields(result, params moleculer.Payload, defaultPopulate []string) moleculer.Payload {
-	//TODO
+func populateFields(ctx moleculer.Context, result, params moleculer.Payload, populates map[string]interface{}) moleculer.Payload {
+	mcalls := <-ctx.MCall(createPopulateMCalls(result, params, populates))
+	populateRecordsWithResults(populates, result, mcalls)
 	return result
 }

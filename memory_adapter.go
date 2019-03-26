@@ -67,26 +67,24 @@ func (adapter *MemoryAdapter) FindOne(params moleculer.Payload) moleculer.Payloa
 	defer tx.Abort()
 	result, err := tx.First(adapter.Table, indexName, search)
 	if err != nil {
-		return payload.Error("Failed trying to find. Error: ", err.Error())
+		return payload.Error("Failed trying to findOne. searchFields: ", indexName, " search: ", search, " Error: ", err.Error())
 	}
 	return payload.New(result)
 }
 
 func (adapter *MemoryAdapter) FindById(params moleculer.Payload) moleculer.Payload {
-	params = params.AddMany(map[string]interface{}{
+	findParams := payload.New(map[string]interface{}{
 		"searchFields": []string{"id"},
-		"search":       params.Get("id").String(),
+		"search":       params.String(),
 	})
-	return adapter.FindOne(params)
+	return adapter.FindOne(findParams)
 }
 
 func (adapter *MemoryAdapter) FindByIds(params moleculer.Payload) moleculer.Payload {
-	ids := params.Get("ids").StringArray()
+	ids := params.StringArray()
 	list := []moleculer.Payload{}
 	for id := range ids {
-		list = append(list, adapter.FindById(payload.New(map[string]interface{}{
-			"id": id,
-		})))
+		list = append(list, adapter.FindById(payload.New(id)))
 	}
 	return payload.New(list)
 }
@@ -105,14 +103,14 @@ func (adapter *MemoryAdapter) Insert(params moleculer.Payload) moleculer.Payload
 	err := tx.Insert(adapter.Table, params)
 	if err != nil {
 		defer tx.Abort()
-		return payload.Error("Failed trying to find. Error: ", err.Error())
+		return payload.Error("Failed trying to Insert. Error: ", err.Error())
 	}
 	defer tx.Commit()
 	return params
 }
 
 func (adapter *MemoryAdapter) Update(params moleculer.Payload) moleculer.Payload {
-	one := adapter.FindById(params)
+	one := adapter.FindById(params.Get("id"))
 	if !one.IsError() && one.Exists() {
 		tx := adapter.db.Txn(true)
 		err := tx.Delete(adapter.Table, one.Value())

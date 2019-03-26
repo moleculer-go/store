@@ -1,0 +1,4 @@
+(*payload.RawPayload)((array (len=2)) {
+  payload.Remove can only deal with map and array payloads.,
+  payload.Remove can only deal with map and array payloads.,
+})
