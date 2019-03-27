@@ -5,6 +5,7 @@ import (
 
 	snap "github.com/moleculer-go/cupaloy"
 	"github.com/moleculer-go/moleculer"
+	"github.com/moleculer-go/moleculer-db/mocks"
 	"github.com/moleculer-go/moleculer/payload"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,7 +30,7 @@ var _ = Describe("Mongo Adapter", func() {
 	totalRecords := 6
 	var johnSnow, marie, johnTravolta moleculer.Payload
 	BeforeEach(func() {
-		johnSnow, marie, johnTravolta = connectAndLoadUsers(adapter)
+		johnSnow, marie, johnTravolta = mocks.ConnectAndLoadUsers(adapter)
 	})
 
 	AfterEach(func() {

@@ -3,6 +3,7 @@ package db
 import (
 	snap "github.com/moleculer-go/cupaloy"
 	"github.com/moleculer-go/moleculer"
+	"github.com/moleculer-go/moleculer-db/mocks"
 	"github.com/moleculer-go/moleculer/payload"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -14,7 +15,7 @@ var _ = Describe("MemoryAdapter", func() {
 
 	var johnSnow, johnTravolta moleculer.Payload
 	BeforeEach(func() {
-		johnSnow, _, johnTravolta = connectAndLoadUsers(adapter)
+		johnSnow, _, johnTravolta = mocks.ConnectAndLoadUsers(adapter)
 	})
 
 	AfterEach(func() {

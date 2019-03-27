@@ -78,6 +78,7 @@ func findAction(adapter Adapter, settings map[string]interface{}) moleculer.Acti
 	}
 }
 
+// listAction
 func listAction(adapter Adapter, serviceSettings map[string]interface{}) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		var rows moleculer.Payload

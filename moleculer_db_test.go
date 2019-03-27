@@ -3,6 +3,8 @@ package db
 import (
 	"github.com/hashicorp/go-memdb"
 	"github.com/moleculer-go/moleculer"
+	"github.com/moleculer-go/moleculer-db/mocks"
+	"github.com/moleculer-go/moleculer/context"
 	"github.com/moleculer-go/moleculer/payload"
 	"github.com/moleculer-go/moleculer/test"
 	. "github.com/onsi/ginkgo"
@@ -41,52 +43,10 @@ var userDbSchema = &memdb.DBSchema{
 	},
 }
 
-func connectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload, moleculer.Payload) {
-	err := adapter.Connect()
-	if err != nil {
-		panic(err)
-	}
-	adapter.RemoveAll()
-	johnSnow := adapter.Insert(payload.New(map[string]interface{}{
-		"name":     "John",
-		"lastname": "Snow",
-		"age":      25,
-	}))
-	Expect(johnSnow.IsError()).Should(BeFalse())
-
-	marie := adapter.Insert(payload.New(map[string]interface{}{
-		"name":     "Marie",
-		"lastname": "Claire",
-		"age":      75,
-	}))
-	Expect(marie.IsError()).Should(BeFalse())
-
-	johnTravolta := adapter.Insert(payload.New(map[string]interface{}{
-		"name":     "John",
-		"lastname": "Travolta",
-		"age":      65,
-	}))
-
-	adapter.Insert(payload.New(map[string]interface{}{
-		"name":     "Julian",
-		"lastname": "Assange",
-		"age":      46,
-	}))
-
-	adapter.Insert(payload.New(map[string]interface{}{
-		"name":     "Peter",
-		"lastname": "Pan",
-		"age":      13,
-	}))
-
-	adapter.Insert(payload.New(map[string]interface{}{
-		"name":     "Stone",
-		"lastname": "Man",
-		"age":      13,
-	}))
-
-	Expect(johnTravolta.IsError()).Should(BeFalse())
-	return johnSnow, marie, johnTravolta
+func contextAndDelegated(nodeID string, config moleculer.Config) (moleculer.BrokerContext, *moleculer.BrokerDelegates) {
+	dl := test.DelegatesWithIdAndConfig(nodeID, config)
+	ctx := context.BrokerContext(dl)
+	return ctx, dl
 }
 
 var _ = Describe("Moleculer DB Mixin", func() {
@@ -96,12 +56,12 @@ var _ = Describe("Moleculer DB Mixin", func() {
 
 		//var johnSnow, marie, johnTravolta moleculer.Payload
 		BeforeEach(func() {
-			connectAndLoadUsers(adapter)
+			mocks.ConnectAndLoadUsers(adapter)
 		})
 		AfterEach(func() {
 			adapter.Disconnect()
 		})
-		ctx, _ := test.ContextAndDelegated("list-test", moleculer.BrokerConfig{})
+		ctx, _ := contextAndDelegated("list-test", moleculer.Config{})
 		It("should return page, pageSize, rows, total and totalPages", func() {
 			params := payload.New(map[string]interface{}{
 				"searchFields": []string{"name"},
@@ -124,7 +84,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 		adapter := memoryAdapter("user", userDbSchema)
 
 		BeforeEach(func() {
-			connectAndLoadUsers(adapter)
+			mocks.ConnectAndLoadUsers(adapter)
 		})
 		AfterEach(func() {
 			adapter.Disconnect()
@@ -135,7 +95,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			"populates": map[string]interface{}{},
 		}
 
-		ctx, delegates := test.ContextAndDelegated("find-test", moleculer.BrokerConfig{})
+		ctx, delegates := contextAndDelegated("find-test", moleculer.Config{})
 		delegates.MultActionDelegate = func(callMaps map[string]map[string]interface{}) chan map[string]moleculer.Payload {
 			c := make(chan map[string]moleculer.Payload, 1)
 			c <- map[string]moleculer.Payload{}
@@ -392,7 +352,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 		adapter := memoryAdapter("user", userDbSchema)
 		var johnSnow, maria moleculer.Payload
 		BeforeEach(func() {
-			johnSnow, maria, _ = connectAndLoadUsers(adapter)
+			johnSnow, maria, _ = mocks.ConnectAndLoadUsers(adapter)
 		})
 		AfterEach(func() {
 			adapter.Disconnect()
@@ -403,7 +363,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			"populates": map[string]interface{}{},
 		}
 
-		ctx, delegates := test.ContextAndDelegated("get-test", moleculer.BrokerConfig{})
+		ctx, delegates := contextAndDelegated("get-test", moleculer.Config{})
 		delegates.MultActionDelegate = func(callMaps map[string]map[string]interface{}) chan map[string]moleculer.Payload {
 			c := make(chan map[string]moleculer.Payload, 1)
 			c <- map[string]moleculer.Payload{}
