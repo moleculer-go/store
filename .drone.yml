@@ -5,6 +5,11 @@ platform:
   os: linux
   arch: amd64
 
+services:
+  - name: mongo
+    image: mongo:4
+    command: [--smallfiles]
+
 steps:
   - name: branch-push
     image: golang

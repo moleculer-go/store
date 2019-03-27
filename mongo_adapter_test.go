@@ -11,8 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-//var MongoTestsHost = "mongodb://192.168.1.110"
-var MongoTestsHost = "mongodb://localhost"
+var MongoTestsHost = "mongodb://mongo"
 
 func mongoAdapter(database, collection string) *MongoAdapter {
 	return &MongoAdapter{
