@@ -41,7 +41,7 @@ var userDbSchema = &memdb.DBSchema{
 
 var _ = Describe("Moleculer DB Integration Tests", func() {
 
-	Describe("populates", func() {
+	XDescribe("populates", func() {
 		var johnSnow, maria, johnT moleculer.Payload
 		mem := &memory.SharedMemory{}
 		bkr := broker.New(&moleculer.Config{
