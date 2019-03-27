@@ -19,6 +19,7 @@ steps:
       - go get -v github.com/onsi/ginkgo/ginkgo
       - go get -v github.com/onsi/gomega
       - go get -v github.com/moleculer-go/cupaloy
+      - go get -v github.com/nats-io/go-nats-streaming
       - mkdir /usr/local/go/src/github.com/
       - mkdir /usr/local/go/src/github.com/moleculer-go
       - ln -s /drone/src/ /usr/local/go/src/github.com/moleculer-go/moleculer-db
