@@ -11,8 +11,13 @@ services:
     command: [--smallfiles]
 
 steps:
-  - name: branch-push
+  - name: tests
     image: golang
+    environment:
+      CODECOV_TOKEN:
+        from_secret: CODECOV_TOKEN
+      COVERALLS_TOKEN:
+        from_secret: COVERALLS_TOKEN
     commands:
       - apt-get update
       - apt-get install unzip
