@@ -1,8 +1,9 @@
 language: go
 
 go:
-  - 1.10.x
+  # 1.11.x first, so coverave is sent as soon as first build finishes.
   - 1.11.x
+  - 1.10.x
   - master
 
 os:
@@ -26,13 +27,8 @@ before_install:
   - go get -v github.com/nats-io/gnatsd
   - go get -v github.com/onsi/ginkgo/ginkgo
   - go get -v github.com/onsi/gomega
-  - echo $TRAVIS_OS_NAME | grep osx && curl -fSsL https://github.com/nats-io/nats-streaming-server/releases/download/v0.11.2/nats-streaming-server-v0.11.2-darwin-amd64.zip -o nats.zip || echo "Skipping OSX"
-  - echo $TRAVIS_OS_NAME | grep linux && curl -fSsL https://github.com/nats-io/nats-streaming-server/releases/download/v0.11.2/nats-streaming-server-v0.11.2-linux-amd64.zip -o nats.zip || echo "Skipping Linux"
-  - echo $TRAVIS_OS_NAME | grep windows && curl -fSsL https://github.com/nats-io/nats-streaming-server/releases/download/v0.11.2/nats-streaming-server-v0.11.2-windows-amd64.zip -o nats.zip || echo "Skipping Windows"
-  - unzip nats.zip && ls
 
 script:
-  - echo $TRAVIS_OS_NAME | grep windows && nats-streaming-server-v0.11.2-windows-amd64/nats-streaming-server || nohup nats-*/nats-streaming-server -mc 0 &
   - ginkgo -r --randomizeAllSpecs --failFast --cover --trace
 
 after_script:
