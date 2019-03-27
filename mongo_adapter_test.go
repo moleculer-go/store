@@ -1,6 +1,7 @@
 package db
 
 import (
+	"os"
 	"time"
 
 	snap "github.com/moleculer-go/cupaloy"
@@ -11,7 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var MongoTestsHost = "mongodb://mongo"
+var MongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
 
 func mongoAdapter(database, collection string) *MongoAdapter {
 	return &MongoAdapter{

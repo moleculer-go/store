@@ -14,7 +14,11 @@ matrix:
   allow_failures:
     - os: windows
 
+services:
+  - mongodb
+
 before_install:
+  - export MONGO_TEST_HOST="127.0.0.1"
   - go get -v golang.org/x/lint/golint
   - go get -v golang.org/x/tools/cmd/cover
   - go get -v github.com/mattn/goveralls
