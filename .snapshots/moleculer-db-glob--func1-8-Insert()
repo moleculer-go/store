@@ -1,5 +1,6 @@
 (*payload.RawPayload)((array (len=1)) {
-  (len=2) {
+  (len=3) {
+  "all": *,
   "lastname": Cesar,
   "name": Julio,
 },

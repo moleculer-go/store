@@ -3,6 +3,7 @@ package db
 import (
 	snap "github.com/moleculer-go/cupaloy"
 	"github.com/moleculer-go/moleculer"
+	"github.com/moleculer-go/moleculer-db/mocks"
 	"github.com/moleculer-go/moleculer/payload"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -10,11 +11,11 @@ import (
 
 var _ = Describe("MemoryAdapter", func() {
 
-	adapter := userAdapter()
+	adapter := memoryAdapter("user", userDbSchema)
 
-	var johnTravolta moleculer.Payload
+	var johnSnow, johnTravolta moleculer.Payload
 	BeforeEach(func() {
-		_, _, johnTravolta = connectAndLoadUsers(adapter)
+		johnSnow, _, johnTravolta = mocks.ConnectAndLoadUsers(adapter)
 	})
 
 	AfterEach(func() {
@@ -23,7 +24,7 @@ var _ = Describe("MemoryAdapter", func() {
 	})
 
 	It("Find() should return matching records", func() {
-		r := adapter.Find(payload.Create(map[string]interface{}{
+		r := adapter.Find(payload.New(map[string]interface{}{
 			"searchFields": []string{"name"},
 			"search":       "John",
 		}))
@@ -32,8 +33,21 @@ var _ = Describe("MemoryAdapter", func() {
 		Expect(snap.SnapshotMulti("Find()", r.Remove("id"))).Should(Succeed())
 	})
 
+	It("FindById() should return one matching records by ID", func() {
+		r := adapter.FindById(johnSnow.Get("id"))
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(snap.SnapshotMulti("FindById()", r.Remove("id"))).Should(Succeed())
+	})
+
+	It("FindByIds() should return one matching records by ID", func() {
+		r := adapter.FindByIds(payload.EmptyList().AddItem(johnSnow.Get("id")).AddItem(johnTravolta.Get("id")))
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Len()).Should(Equal(2))
+		Expect(snap.SnapshotMulti("FindByIds()", r.Remove("id"))).Should(Succeed())
+	})
+
 	It("Count() should return matching records", func() {
-		r := adapter.Count(payload.Create(map[string]interface{}{
+		r := adapter.Count(payload.New(map[string]interface{}{
 			"searchFields": []string{"name"},
 			"search":       "John",
 		}))
@@ -43,7 +57,7 @@ var _ = Describe("MemoryAdapter", func() {
 	})
 
 	It("Update() should update existing record matching records", func() {
-		r := adapter.Update(payload.Create(map[string]interface{}{
+		r := adapter.Update(payload.New(map[string]interface{}{
 			"id":  johnTravolta.Get("id").String(),
 			"age": 67,
 		}))
@@ -54,7 +68,7 @@ var _ = Describe("MemoryAdapter", func() {
 	})
 
 	It("Insert() should insert new records", func() {
-		r := adapter.Insert(payload.Create(map[string]interface{}{
+		r := adapter.Insert(payload.New(map[string]interface{}{
 			"name":     "Julio",
 			"lastname": "Cesar",
 		}))
@@ -62,13 +76,25 @@ var _ = Describe("MemoryAdapter", func() {
 		Expect(r.Get("name").String()).Should(Equal("Julio"))
 		Expect(r.Get("lastname").String()).Should(Equal("Cesar"))
 
-		r = adapter.Find(payload.Create(map[string]interface{}{
+		r = adapter.Find(payload.New(map[string]interface{}{
 			"searchFields": []string{"name"},
 			"search":       "Julio",
 		}))
 		Expect(r.IsError()).Should(BeFalse())
 		Expect(r.Len()).Should(Equal(1))
 		Expect(snap.SnapshotMulti("Insert()", r.Remove("id"))).Should(Succeed())
+	})
+
+	It("RemoveAll() should remove all records and return total of removed items", func() {
+		total := adapter.Count(payload.Empty())
+		Expect(total.Int()).Should(Equal(6))
+
+		count := adapter.RemoveAll()
+		Expect(count.IsError()).Should(BeFalse())
+		Expect(count.Int()).Should(Equal(6))
+
+		total = adapter.Count(payload.Empty())
+		Expect(total.Int()).Should(Equal(0))
 	})
 
 })
