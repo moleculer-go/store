@@ -30,20 +30,20 @@ var _ = Describe("MemoryAdapter", func() {
 		}))
 		Expect(r.IsError()).Should(BeFalse())
 		Expect(r.Len()).Should(Equal(2))
-		Expect(snap.SnapshotMulti("Find()", r.Remove("id"))).Should(Succeed())
+		Expect(snap.SnapshotMulti("Find()", r.Remove("id", "friends"))).Should(Succeed())
 	})
 
 	It("FindById() should return one matching records by ID", func() {
 		r := adapter.FindById(johnSnow.Get("id"))
 		Expect(r.IsError()).Should(BeFalse())
-		Expect(snap.SnapshotMulti("FindById()", r.Remove("id"))).Should(Succeed())
+		Expect(snap.SnapshotMulti("FindById()", r.Remove("id", "friends"))).Should(Succeed())
 	})
 
 	It("FindByIds() should return one matching records by ID", func() {
 		r := adapter.FindByIds(payload.EmptyList().AddItem(johnSnow.Get("id")).AddItem(johnTravolta.Get("id")))
 		Expect(r.IsError()).Should(BeFalse())
 		Expect(r.Len()).Should(Equal(2))
-		Expect(snap.SnapshotMulti("FindByIds()", r.Remove("id"))).Should(Succeed())
+		Expect(snap.SnapshotMulti("FindByIds()", r.Remove("id", "friends"))).Should(Succeed())
 	})
 
 	It("Count() should return matching records", func() {

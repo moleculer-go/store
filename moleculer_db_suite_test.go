@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestMoleculerWeb(t *testing.T) {
+func TestMoleculerDb(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Moleculer DB Unit Tests")
 }

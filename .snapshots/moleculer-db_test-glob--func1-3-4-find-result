@@ -1,4 +1,4 @@
-(*payload.RawPayload)((array (len=4)) {
+(*payload.RawPayload)((array (len=6)) {
   (len=3) {
   "age": 13,
   "lastname": Man,
@@ -10,9 +10,19 @@
   "name": Peter,
 },
   (len=3) {
+  "age": 25,
+  "lastname": Snow,
+  "name": John,
+},
+  (len=3) {
   "age": 46,
   "lastname": Assange,
   "name": Julian,
+},
+  (len=3) {
+  "age": 65,
+  "lastname": Travolta,
+  "name": John,
 },
   (len=3) {
   "age": 75,

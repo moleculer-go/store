@@ -144,7 +144,7 @@ func (adapter *MemoryAdapter) RemoveById(params moleculer.Payload) moleculer.Pay
 			return payload.Error("Failed trying to removed record. source error: ", err.Error())
 		}
 		defer tx.Commit()
-		return params
+		return payload.Empty().Add("deletedCount", 1)
 	}
 	return nil
 }

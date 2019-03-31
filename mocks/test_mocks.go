@@ -29,6 +29,7 @@ func ConnectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload,
 		"name":     "Marie",
 		"lastname": "Claire",
 		"age":      75,
+		"master":   johnSnow.Get("id").String(),
 	}))
 	Expect(marie.IsError()).Should(BeFalse())
 
@@ -36,6 +37,7 @@ func ConnectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload,
 		"name":     "John",
 		"lastname": "Travolta",
 		"age":      65,
+		"friends":  []string{johnSnow.Get("id").String(), marie.Get("id").String()},
 	}))
 
 	adapter.Insert(payload.New(map[string]interface{}{

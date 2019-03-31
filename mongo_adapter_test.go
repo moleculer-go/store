@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -12,11 +13,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var MongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
+var mongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
 
 func mongoAdapter(database, collection string) *MongoAdapter {
+	fmt.Println("mongoTestsHost: ", mongoTestsHost)
 	return &MongoAdapter{
-		MongoURL:   MongoTestsHost,
+		MongoURL:   mongoTestsHost,
 		Timeout:    2 * time.Second,
 		Database:   database,
 		Collection: collection,

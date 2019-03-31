@@ -1,0 +1,1 @@
+(*payload.RawPayload)(payload.Remove can only deal with map and array payloads.)
