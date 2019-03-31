@@ -28,6 +28,9 @@ type MongoAdapter struct {
 
 // Connect connect to mongo, stores the client and the collection.
 func (adapter *MongoAdapter) Connect() error {
+	if adapter.coll != nil {
+		return nil
+	}
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	var err error
 	adapter.client, err = mongo.Connect(ctx, options.Client().ApplyURI(adapter.MongoURL))
@@ -45,6 +48,7 @@ func (adapter *MongoAdapter) Connect() error {
 // Disconnect disconnects from mongo.
 func (adapter *MongoAdapter) Disconnect() error {
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
+	adapter.coll = nil
 	return adapter.client.Disconnect(ctx)
 }
 

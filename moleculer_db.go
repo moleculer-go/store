@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"math"
 	"sync"
 
@@ -16,7 +17,7 @@ var maxLimit = -1
 
 var defaultSettings = map[string]interface{}{
 	//idField : Name of ID field.
-	"idField": "_id",
+	"idField": "id",
 
 	//fields : Field filtering list. It must be an `Array`. If the value is `null` or `undefined` doesn't filter the fields of entities.
 	"fields": []string{"**"},
@@ -201,20 +202,23 @@ func Mixin(adapter Adapter) moleculer.Mixin {
 		},
 		Started: func(context moleculer.BrokerContext, svc moleculer.Service) {
 			instance = &svc
-
+			if adapter == nil {
+				settingsAdapter, exists := instance.Settings["db-adapter"]
+				if exists {
+					context.Logger().Debug("db-mixin started. adapter from settings!")
+					adapter = settingsAdapter.(Adapter)
+				}
+			}
 			if adapter != nil {
-				context.Logger().Debug("db-mixin started. adapter was provided on higher function!")
-				return
+				context.Logger().Debug("db-mixin started. adapter.Connect() ... ")
+				adapter.Connect()
 			}
-			settingsAdapter, exists := instance.Settings["db-adapter"]
-			if !exists {
-				return
-			}
-			context.Logger().Debug("db-mixin started. adapter from settings!")
-			adapter = settingsAdapter.(Adapter)
 		},
 		Stopped: func(context moleculer.BrokerContext, svc moleculer.Service) {
-
+			if adapter != nil {
+				context.Logger().Debug("db-mixin stopped. adapter.Disconnect() ... ")
+				adapter.Disconnect()
+			}
 		},
 		Actions: []moleculer.Action{
 			//find action
@@ -399,6 +403,9 @@ func addIds(params, item moleculer.Payload, field string) moleculer.Payload {
 func createPopulateCall(calls map[string]map[string]interface{}, item moleculer.Payload, populates map[string]interface{}) {
 	id := item.Get("id").String()
 	for field, config := range populates {
+		if !item.Get(field).Exists() {
+			continue
+		}
 		action := actionFromPopulate(config)
 		if action == "" {
 			continue
@@ -471,7 +478,10 @@ func populateFields(ctx moleculer.Context, result, params moleculer.Payload, pop
 		populates = params.Get("populates").RawMap()
 	}
 	mparams := createPopulateMCalls(result, params, populates)
-	mcalls := <-ctx.MCall(mparams)
-	result = populateRecordsWithResults(populates, result, mcalls)
+	fmt.Println("mparams: ", mparams)
+	if len(mparams) > 0 {
+		mcalls := <-ctx.MCall(mparams)
+		result = populateRecordsWithResults(populates, result, mcalls)
+	}
 	return result
 }
