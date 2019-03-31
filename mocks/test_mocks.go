@@ -24,7 +24,6 @@ func ConnectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload,
 		"age":      25,
 	}))
 	Expect(johnSnow.IsError()).Should(BeFalse())
-
 	marie := adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "Marie",
 		"lastname": "Claire",

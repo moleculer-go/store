@@ -72,7 +72,7 @@ var _ = Describe("Mongo Adapter", func() {
 			}))
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Len()).Should(Equal(totalRecords))
-			Expect(snap.SnapshotMulti("sort-1", result.Remove("_id"))).Should(Succeed())
+			Expect(snap.SnapshotMulti("sort-1", result.Remove("id"))).Should(Succeed())
 
 			result2 := adapter.Find(payload.New(M{
 				"query": M{},
@@ -80,7 +80,7 @@ var _ = Describe("Mongo Adapter", func() {
 			}))
 			Expect(result2.IsError()).Should(BeFalse())
 			Expect(result2.Len()).Should(Equal(totalRecords))
-			result2 = result2.Remove("_id")
+			result2 = result2.Remove("id")
 			Expect(snap.SnapshotMulti("sort-2", result2)).Should(Succeed())
 
 			//shuold not match sort-1
@@ -95,7 +95,7 @@ var _ = Describe("Mongo Adapter", func() {
 			}))
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Len()).Should(Equal(totalRecords - 2))
-			Expect(snap.SnapshotMulti("offset-2", result.Remove("_id"))).Should(Succeed())
+			Expect(snap.SnapshotMulti("offset-2", result.Remove("id", "master"))).Should(Succeed())
 
 			result = adapter.Find(payload.New(M{
 				"query":  M{},
@@ -104,7 +104,7 @@ var _ = Describe("Mongo Adapter", func() {
 			}))
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Len()).Should(Equal(totalRecords - 4))
-			Expect(snap.SnapshotMulti("offset-4", result.Remove("_id"))).Should(Succeed())
+			Expect(snap.SnapshotMulti("offset-4", result.Remove("id"))).Should(Succeed())
 		})
 
 		It("should find using an empty query and limit = 3 and return 3 records", func() {
@@ -164,14 +164,14 @@ var _ = Describe("Mongo Adapter", func() {
 
 	Describe("FindById", func() {
 		It("should find a records by its ID", func() {
-			result := adapter.FindById(johnSnow.Get("_id"))
+			result := adapter.FindById(johnSnow.Get("id"))
 			Expect(result.Exists()).Should(BeTrue())
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Get("name").String()).Should(Equal(johnSnow.Get("name").String()))
 			Expect(result.Get("lastname").String()).Should(Equal(johnSnow.Get("lastname").String()))
 			Expect(result.Get("age").Int()).Should(Equal(johnSnow.Get("age").Int()))
 
-			result = adapter.FindById(marie.Get("_id"))
+			result = adapter.FindById(marie.Get("id"))
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Get("name").String()).Should(Equal(marie.Get("name").String()))
 			Expect(result.Get("lastname").String()).Should(Equal(marie.Get("lastname").String()))
@@ -209,7 +209,7 @@ var _ = Describe("Mongo Adapter", func() {
 
 	Describe("FindByIds", func() {
 		It("should find multiple records", func() {
-			result := adapter.FindByIds(payload.EmptyList().AddItem(johnSnow.Get("_id")).AddItem(marie.Get("_id")).AddItem(johnTravolta.Get("_id")))
+			result := adapter.FindByIds(payload.EmptyList().AddItem(johnSnow.Get("id")).AddItem(marie.Get("id")).AddItem(johnTravolta.Get("id")))
 			Expect(result.Exists()).Should(BeTrue())
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Array()[0].Get("name").String()).Should(Equal("John"))
@@ -221,7 +221,7 @@ var _ = Describe("Mongo Adapter", func() {
 
 	Describe("Removes", func() {
 		It("RemoveById should removed a record using a specific ID", func() {
-			result := adapter.RemoveById(johnSnow.Get("_id"))
+			result := adapter.RemoveById(johnSnow.Get("id"))
 			Expect(result.Exists()).Should(BeTrue())
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Get("deletedCount").Int()).Should(Equal(1))
@@ -247,7 +247,7 @@ var _ = Describe("Mongo Adapter", func() {
 
 		It("Update should update record", func() {
 			result := adapter.Update(payload.Empty().AddMany(M{
-				"_id":      johnSnow.Get("_id").String(),
+				"id":       johnSnow.Get("id").String(),
 				"age":      175,
 				"lastname": "Cruzader",
 				"house":    "Spark",
@@ -256,21 +256,21 @@ var _ = Describe("Mongo Adapter", func() {
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Get("modifiedCount").Int()).Should(Equal(1))
 
-			result = adapter.FindById(johnSnow.Get("_id"))
+			result = adapter.FindById(johnSnow.Get("id"))
 			Expect(result.Get("age").Int()).Should(Equal(175))
 			Expect(result.Get("lastname").String()).Should(Equal("Cruzader"))
 			Expect(result.Get("house").String()).Should(Equal("Spark"))
 		})
 
 		It("UpdateById should update record", func() {
-			result := adapter.UpdateById(johnSnow.Get("_id"), payload.Empty().Add("$set", M{
+			result := adapter.UpdateById(johnSnow.Get("id"), payload.New(M{
 				"age": 120,
 			}))
 			Expect(result.Exists()).Should(BeTrue())
 			Expect(result.IsError()).Should(BeFalse())
 			Expect(result.Get("modifiedCount").Int()).Should(Equal(1))
 
-			result = adapter.UpdateById(marie.Get("_id"), payload.Empty().Add("$set", M{
+			result = adapter.UpdateById(marie.Get("id"), payload.New(M{
 				"lastname": "Vai com as outras",
 				"age":      320,
 				"newField": "newValue",
@@ -278,12 +278,12 @@ var _ = Describe("Mongo Adapter", func() {
 			Expect(result.Exists()).Should(BeTrue())
 			Expect(result.IsError()).Should(BeFalse())
 
-			result = adapter.FindById(marie.Get("_id"))
+			result = adapter.FindById(marie.Get("id"))
 			Expect(result.Get("age").Int()).Should(Equal(320))
 			Expect(result.Get("lastname").String()).Should(Equal("Vai com as outras"))
 			Expect(result.Get("newField").String()).Should(Equal("newValue"))
 
-			result = adapter.FindById(johnSnow.Get("_id"))
+			result = adapter.FindById(johnSnow.Get("id"))
 			Expect(result.Get("age").Int()).Should(Equal(120))
 
 		})

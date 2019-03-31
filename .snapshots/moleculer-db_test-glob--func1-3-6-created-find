@@ -1,1 +1,4 @@
-(*payload.RawPayload)(payload.Remove can only deal with map and array payloads.)
+(*payload.RawPayload)((len=2) {
+  "lastname": DoCaixao,
+  "name": Ze,
+})

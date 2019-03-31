@@ -152,6 +152,7 @@ func (adapter *MongoAdapter) openCursor(params moleculer.Payload) (*mongo.Cursor
 	return cursor, ctx, nil
 }
 
+// applyTransforms apply a list of transformations on the value param.
 func applyTransforms(value bson.M, transforms ...func(bson.M) bson.M) bson.M {
 	for _, transform := range transforms {
 		value = transform(value)
@@ -179,9 +180,11 @@ func cursorToPayload(ctx context.Context, cursor *mongo.Cursor, transform ...fun
 
 // idTransform transform id from primitive.ObjectID to string
 func idTransform(bm bson.M) bson.M {
-	id, hasId := bm["_id"]
-	if hasId {
-		bm["_id"] = id.(primitive.ObjectID).Hex()
+	_, hasId := bm["id"]
+	_id, has_Id := bm["_id"]
+	if has_Id && !hasId {
+		bm["id"] = _id.(primitive.ObjectID).Hex()
+		delete(bm, "_id")
 	}
 	return bm
 }
@@ -202,14 +205,12 @@ func (adapter *MongoAdapter) FindOne(params moleculer.Payload) moleculer.Payload
 }
 
 func (adapter *MongoAdapter) FindById(params moleculer.Payload) moleculer.Payload {
-	id, err := primitive.ObjectIDFromHex(params.String())
+	objId, err := primitive.ObjectIDFromHex(params.String())
 	if err != nil {
 		return payload.Error("Invalid id error: ", err)
 	}
 	filter := payload.New(bson.M{
-		"query": bson.M{
-			"_id": id,
-		},
+		"query": bson.M{"_id": objId},
 		"limit": 1,
 	})
 	return adapter.FindOne(filter)
@@ -240,29 +241,30 @@ func (adapter *MongoAdapter) Count(params moleculer.Payload) moleculer.Payload {
 
 func (adapter *MongoAdapter) Insert(params moleculer.Payload) moleculer.Payload {
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
-	res, err := adapter.coll.InsertOne(ctx, params.Bson())
+	values := params.Bson()
+	res, err := adapter.coll.InsertOne(ctx, values)
 	if err != nil {
 		return payload.Error("Error while trying to insert record. Error: ", err.Error())
 	}
-	return params.Add("_id", res.InsertedID.(primitive.ObjectID).Hex())
+	return params.Add("id", res.InsertedID.(primitive.ObjectID).Hex())
 }
 
 func (adapter *MongoAdapter) Update(params moleculer.Payload) moleculer.Payload {
-	id := params.Get("_id")
+	id := params.Get("id")
 	if !id.Exists() {
-		return payload.Error("Cannot update record without _id")
+		return payload.Error("Cannot update record without id")
 	}
-	return adapter.UpdateById(id, payload.Empty().Add("$set", params.Remove("_id")))
+	return adapter.UpdateById(id, params.Remove("id"))
 }
 
 func (adapter *MongoAdapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
-	hexid, err := primitive.ObjectIDFromHex(id.String())
+	objId, err := primitive.ObjectIDFromHex(id.String())
 	if err != nil {
-		return payload.Error("Cannot update record without _id - error: ", err)
+		return payload.Error("Cannot update record without id - error: ", err)
 	}
-
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
-	ur, uerr := adapter.coll.UpdateOne(ctx, bson.M{"_id": hexid}, update.Bson())
+	values := payload.Empty().Add("$set", update).Bson()
+	ur, uerr := adapter.coll.UpdateOne(ctx, bson.M{"_id": objId}, values)
 	if uerr != nil {
 		return payload.Error("Cannot update record - error: ", uerr)
 	}
@@ -270,12 +272,12 @@ func (adapter *MongoAdapter) UpdateById(id, update moleculer.Payload) moleculer.
 }
 
 func (adapter *MongoAdapter) RemoveById(id moleculer.Payload) moleculer.Payload {
-	hexid, err := primitive.ObjectIDFromHex(id.String())
+	objId, err := primitive.ObjectIDFromHex(id.String())
 	if err != nil {
-		return payload.Error("Cannot update record without _id - error: ", err)
+		return payload.Error("Cannot update record without id - error: ", err)
 	}
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
-	dr, uerr := adapter.coll.DeleteOne(ctx, bson.M{"_id": hexid})
+	dr, uerr := adapter.coll.DeleteOne(ctx, bson.M{"_id": objId})
 	if uerr != nil {
 		return payload.Error("Cannot update record - error: ", uerr)
 	}

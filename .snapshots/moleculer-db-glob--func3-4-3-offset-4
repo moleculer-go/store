@@ -1,0 +1,12 @@
+(*payload.RawPayload)((array (len=2)) {
+  (len=3) {
+  "age": 13,
+  "lastname": Man,
+  "name": Stone,
+},
+  (len=3) {
+  "age": 13,
+  "lastname": Pan,
+  "name": Peter,
+},
+})

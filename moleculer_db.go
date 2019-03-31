@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"math"
 	"sync"
 
@@ -148,7 +147,6 @@ func listAction(adapter Adapter, getInstance func() *moleculer.Service) molecule
 		}()
 		total := adapter.Count(params)
 		wg.Wait()
-		fmt.Println("listAction() instance.Settings ", getInstance().Settings)
 		pageSize := getInstance().Settings["pageSize"].(int)
 		if params.Get("pageSize").Exists() {
 			pageSize = params.Get("pageSize").Int()
@@ -408,7 +406,6 @@ func createPopulateCall(calls map[string]map[string]interface{}, item moleculer.
 		mcallName := id + "_" + field + "_" + action
 		actionParams := actionParamsFromPopulate(config)
 		actionParams = addIds(actionParams, item, field)
-
 		calls[mcallName] = map[string]interface{}{
 			"action": action,
 			"params": actionParams,

@@ -1,7 +1,6 @@
 package db_test
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -48,6 +47,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		})
 
 		It("get should populate friends field", func() {
+
 			user := <-bkr.Call("user.get", map[string]interface{}{
 				"id": johnT.Get("id").String(),
 				"populates": map[string]interface{}{
@@ -88,7 +88,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		return p.Remove("id", "_id", "master", "friends")
 	}
 
-	FDescribe("actions", func() {
+	Describe("actions", func() {
 		var johnSnow, marie, johnT moleculer.Payload
 		bkr := broker.New(&moleculer.Config{
 			DiscoverNodeID: func() string { return "node_find" },
@@ -134,17 +134,14 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			rs := <-bkr.Call("user.create", map[string]interface{}{"name": "Ze", "lastname": "DoCaixao"})
 			Expect(rs.IsError()).Should(BeFalse())
 			Expect(snap.SnapshotMulti("created-record", cleanResult(rs))).Should(Succeed())
-
 			fr := <-bkr.Call("user.get", map[string]interface{}{"id": rs.Get("id").String()})
 			Expect(snap.SnapshotMulti("created-find", cleanResult(fr))).Should(Succeed())
 		})
 
 		It("update a record and match with snapshot", func() {
 			rs := <-bkr.Call("user.update", map[string]interface{}{"id": johnSnow.Get("id").String(), "name": "Ze", "lastname": "DasCouves"})
-			fmt.Println("update rs: ", rs)
 			Expect(rs.IsError()).Should(BeFalse())
 			Expect(snap.SnapshotMulti("updated-record", cleanResult(rs))).Should(Succeed())
-
 			fr := <-bkr.Call("user.get", map[string]interface{}{"id": johnSnow.Get("id").String()})
 			Expect(snap.SnapshotMulti("updated-find", cleanResult(fr))).Should(Succeed())
 		})
@@ -153,7 +150,6 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			rs := <-bkr.Call("user.remove", map[string]interface{}{"id": johnT.Get("id").String()})
 			Expect(rs.IsError()).Should(BeFalse())
 			Expect(snap.SnapshotMulti("removed-record", cleanResult(rs))).Should(Succeed())
-
 			fr := <-bkr.Call("user.get", map[string]interface{}{"id": johnT.Get("id").String()})
 			Expect(snap.SnapshotMulti("removed-find", cleanResult(fr))).Should(Succeed())
 		})
