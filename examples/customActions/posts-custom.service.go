@@ -18,13 +18,14 @@ func main() {
 			"fields":    []string{"id", "username", "name"},
 			"populates": map[string]interface{}{"friends": "users.get"},
 		},
-		Mixins: []moleculer.Mixin{db.Mixin(&db.MongoAdapter{
-			MongoURL:   "mongodb://localhost:27017",
-			Collection: "users",
-			Database:   "services",
-			Timeout:    time.Second * 10,
+		Mixins: []moleculer.Mixin{db.Mixin(&db.MemoryAdapter{
+			Table:        "users",
+			SearchFields: []string{"name", "username"},
 		})},
 	})
+	adapter := &db.MemoryAdapter{
+		Table: "posts",
+	}
 	bkr.AddService(moleculer.Service{
 		Name: "posts",
 		Settings: map[string]interface{}{
@@ -40,12 +41,21 @@ func main() {
 				},
 			},
 		},
-		Mixins: []moleculer.Mixin{db.Mixin(&db.MongoAdapter{
-			MongoURL:   "mongodb://localhost:27017",
-			Collection: "posts",
-			Database:   "services",
-			Timeout:    time.Second * 10,
-		})},
+		Mixins: []moleculer.Mixin{db.Mixin(adapter)},
+		Actions: []moleculer.Action{
+			{
+				Name: "byAuthors",
+				Handler: func(ctx moleculer.Context, params moleculer.Payload) interface{} {
+					return <-ctx.Call("posts.find", map[string]interface{}{
+						"query": map[string]interface{}{
+							"author": params.Get("authorId").String(),
+						},
+						"limit": 10,
+						"sort":  "-createdAt",
+					})
+				},
+			},
+		},
 	})
 	bkr.Start()
 	time.Sleep(time.Millisecond * 300)
@@ -71,8 +81,8 @@ func main() {
 	})
 
 	// List posts with populated authors
-	fmt.Printf("posts with authors: ", <-bkr.Call("posts.find", map[string]interface{}{
-		"populate": []string{"author"},
+	fmt.Printf("posts by authors: ", <-bkr.Call("posts.byAuthors", map[string]interface{}{
+		"authorId": johnSnow.Get("id").String(),
 	}))
 
 	// remove post

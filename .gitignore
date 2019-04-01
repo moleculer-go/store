@@ -13,3 +13,4 @@
 *.coverprofile
 
 examples/users/users
+examples/usersMongo/users
