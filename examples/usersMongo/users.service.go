@@ -8,57 +8,63 @@ import (
 
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/broker"
+	"github.com/moleculer-go/moleculer/cli"
 )
 
 func main() {
-	var bkr = broker.New(&moleculer.Config{LogLevel: "info"})
-	bkr.AddService(moleculer.Service{
-		Name: "users",
-		Settings: map[string]interface{}{
-			"fields":    []string{"_id", "username", "name"},
-			"populates": map[string]interface{}{"friends": "users.get"},
-		},
-		Mixins: []moleculer.Mixin{db.Mixin(&db.MongoAdapter{
-			MongoURL:   "mongodb://localhost:27017",
-			Collection: "users",
-			Database:   "test",
-			Timeout:    time.Second * 5,
-		})},
-	})
-	bkr.Start()
-	time.Sleep(time.Millisecond * 300)
-	user := <-bkr.Call("users.create", map[string]interface{}{
-		"username": "john",
-		"name":     "John Doe",
-		"status":   1,
-	})
+	cli.Start(
+		&moleculer.Config{LogLevel: "info"},
+		func(broker *broker.ServiceBroker) {
 
-	id := user.Get("id").String()
-	// Get all users
-	fmt.Printf("all users: ", <-bkr.Call("users.find", map[string]interface{}{}))
+			broker.AddService(moleculer.Service{
+				Name: "users",
+				Settings: map[string]interface{}{
+					"fields":    []string{"_id", "username", "name"},
+					"populates": map[string]interface{}{"friends": "users.get"},
+				},
+				Mixins: []moleculer.Mixin{db.Mixin(&db.MongoAdapter{
+					MongoURL:   "mongodb://localhost:27017",
+					Collection: "users",
+					Database:   "test",
+					Timeout:    time.Second * 5,
+				})},
+			})
+			broker.Start()
+			time.Sleep(time.Millisecond * 300)
+			user := <-broker.Call("users.create", map[string]interface{}{
+				"username": "john",
+				"name":     "John Doe",
+				"status":   1,
+			})
 
-	// List users with pagination
-	fmt.Printf("list users: ", <-bkr.Call("users.list", map[string]interface{}{
-		"page":     2,
-		"pageSize": 10,
-	}))
+			id := user.Get("id").String()
+			// Get all users
+			fmt.Printf("all users: ", <-broker.Call("users.find", map[string]interface{}{}))
 
-	idParam := map[string]interface{}{"id": id}
+			// List users with pagination
+			fmt.Printf("list users: ", <-broker.Call("users.list", map[string]interface{}{
+				"page":     2,
+				"pageSize": 10,
+			}))
 
-	// Get a user
-	fmt.Printf("get user: ", <-bkr.Call("users.get", idParam))
+			idParam := map[string]interface{}{"id": id}
 
-	// Update a user
-	fmt.Printf("update user: ", <-bkr.Call("users.update", map[string]interface{}{
-		"id":   id,
-		"name": "Jane Doe",
-	}))
+			// Get a user
+			fmt.Printf("get user: ", <-broker.Call("users.get", idParam))
 
-	// Print user after update
-	fmt.Printf("get user: ", <-bkr.Call("users.get", idParam))
+			// Update a user
+			fmt.Printf("update user: ", <-broker.Call("users.update", map[string]interface{}{
+				"id":   id,
+				"name": "Jane Doe",
+			}))
 
-	// Delete a user
-	fmt.Printf("remove user: ", <-bkr.Call("users.remove", idParam))
+			// Print user after update
+			fmt.Printf("get user: ", <-broker.Call("users.get", idParam))
 
-	bkr.Stop()
+			// Delete a user
+			fmt.Printf("remove user: ", <-broker.Call("users.remove", idParam))
+
+			broker.Stop()
+
+		})
 }
