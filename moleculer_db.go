@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"math"
 	"sync"
 
@@ -400,10 +399,14 @@ func addIds(params, item moleculer.Payload, field string) moleculer.Payload {
 }
 
 // createPopulateCall add populates call to mcalls params for a given item.
-func createPopulateCall(calls map[string]map[string]interface{}, item moleculer.Payload, populates map[string]interface{}) {
+func createPopulateCall(calls map[string]map[string]interface{}, item moleculer.Payload, populates map[string]interface{}, fields []string) {
 	id := item.Get("id").String()
-	for field, config := range populates {
+	for _, field := range fields {
 		if !item.Get(field).Exists() {
+			continue
+		}
+		config, hasConfig := populates[field]
+		if !hasConfig {
 			continue
 		}
 		action := actionFromPopulate(config)
@@ -427,23 +430,27 @@ func createPopulateCall(calls map[string]map[string]interface{}, item moleculer.
 // user.id is the filter
 // user.comments -> loaded from the comments service. comments.byUserId
 // if is a list of users.. then collect all ids and make a single call.
-func createPopulateMCalls(result, params moleculer.Payload, populates map[string]interface{}) map[string]map[string]interface{} {
+func createPopulateMCalls(result, params moleculer.Payload, populates map[string]interface{}, fields []string) map[string]map[string]interface{} {
 	calls := map[string]map[string]interface{}{}
 	if result.IsArray() {
 		result.ForEach(func(_ interface{}, item moleculer.Payload) bool {
-			createPopulateCall(calls, item, populates)
+			createPopulateCall(calls, item, populates, fields)
 			return true
 		})
 	} else {
-		createPopulateCall(calls, result, populates)
+		createPopulateCall(calls, result, populates, fields)
 	}
 	return calls
 }
 
 // populateSingleRecordWithResults populate a single record with the populate values from the Mcall result.
-func populateSingleRecordWithResults(populates map[string]interface{}, item moleculer.Payload, mcalls map[string]moleculer.Payload) moleculer.Payload {
+func populateSingleRecordWithResults(populates map[string]interface{}, item moleculer.Payload, mcalls map[string]moleculer.Payload, fields []string) moleculer.Payload {
 	id := item.Get("id").String()
-	for field, config := range populates {
+	for _, field := range fields {
+		config, hasConfig := populates[field]
+		if !hasConfig {
+			continue
+		}
 		action := actionFromPopulate(config)
 		if action == "" {
 			continue
@@ -459,29 +466,34 @@ func populateSingleRecordWithResults(populates map[string]interface{}, item mole
 }
 
 // populateRecordsWithResults populate one record or multiple with the populatye values from the Mcall result.
-func populateRecordsWithResults(populates map[string]interface{}, result moleculer.Payload, mcalls map[string]moleculer.Payload) moleculer.Payload {
+func populateRecordsWithResults(populates map[string]interface{}, result moleculer.Payload, mcalls map[string]moleculer.Payload, fields []string) moleculer.Payload {
 	if result.IsArray() {
 		list := []moleculer.Payload{}
 		result.ForEach(func(index interface{}, item moleculer.Payload) bool {
-			list = append(list, populateSingleRecordWithResults(populates, item, mcalls))
+			list = append(list, populateSingleRecordWithResults(populates, item, mcalls, fields))
 			return true
 		})
 		return payload.New(list)
 	} else {
-		return populateSingleRecordWithResults(populates, result, mcalls)
+		return populateSingleRecordWithResults(populates, result, mcalls, fields)
 	}
 }
 
 // populateFields populate fields on the results.
 func populateFields(ctx moleculer.Context, result, params moleculer.Payload, populates map[string]interface{}) moleculer.Payload {
-	if params.Get("populates").Exists() && params.Get("populates").IsMap() {
-		populates = params.Get("populates").RawMap()
+	if !params.Get("populate").Exists() {
+		return result
 	}
-	mparams := createPopulateMCalls(result, params, populates)
-	fmt.Println("mparams: ", mparams)
+	var fields []string
+	if params.Get("populate").IsArray() {
+		fields = params.Get("populate").StringArray()
+	} else {
+		fields = []string{params.Get("populate").String()}
+	}
+	mparams := createPopulateMCalls(result, params, populates, fields)
 	if len(mparams) > 0 {
 		mcalls := <-ctx.MCall(mparams)
-		result = populateRecordsWithResults(populates, result, mcalls)
+		result = populateRecordsWithResults(populates, result, mcalls, fields)
 	}
 	return result
 }

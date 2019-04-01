@@ -13,13 +13,48 @@ import (
 
 //MemoryAdapter stores data in memory!
 type MemoryAdapter struct {
-	Schema *memdb.DBSchema
-	Table  string
-	db     *memdb.MemDB
+	//Schema *memdb.DBSchema
+	SearchFields []string
+	Table        string
+	db           *memdb.MemDB
+}
+
+func (adapter *MemoryAdapter) generateSchema() *memdb.DBSchema {
+
+	Indexes := map[string]*memdb.IndexSchema{
+		"id": &memdb.IndexSchema{
+			Name:    "id",
+			Unique:  true,
+			Indexer: &PayloadIndex{Field: "id"},
+		},
+		"all": &memdb.IndexSchema{
+			Name:    "all",
+			Unique:  false,
+			Indexer: &PayloadIndex{Field: "all"},
+		},
+	}
+	if adapter.SearchFields != nil {
+		for _, field := range adapter.SearchFields {
+			Indexes[field] = &memdb.IndexSchema{
+				Name:    field,
+				Unique:  false,
+				Indexer: &PayloadIndex{Field: field},
+			}
+		}
+	}
+	return &memdb.DBSchema{
+		Tables: map[string]*memdb.TableSchema{
+			adapter.Table: &memdb.TableSchema{
+				Name:    adapter.Table,
+				Indexes: Indexes,
+			},
+		},
+	}
 }
 
 func (adapter *MemoryAdapter) Connect() error {
-	db, err := memdb.NewMemDB(adapter.Schema)
+	schema := adapter.generateSchema()
+	db, err := memdb.NewMemDB(schema)
 	if err != nil {
 		return err
 	}

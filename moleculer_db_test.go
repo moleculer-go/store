@@ -3,7 +3,6 @@ package db
 import (
 	"time"
 
-	"github.com/hashicorp/go-memdb"
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer-db/mocks"
 	"github.com/moleculer-go/moleculer/context"
@@ -12,38 +11,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-func memoryAdapter(table string, dbSchema *memdb.DBSchema) *MemoryAdapter {
-	return &MemoryAdapter{
-		Table:  table,
-		Schema: dbSchema,
-	}
-}
-
-var userDbSchema = &memdb.DBSchema{
-	Tables: map[string]*memdb.TableSchema{
-		"user": &memdb.TableSchema{
-			Name: "user",
-			Indexes: map[string]*memdb.IndexSchema{
-				"id": &memdb.IndexSchema{
-					Name:    "id",
-					Unique:  true,
-					Indexer: &PayloadIndex{Field: "id"},
-				},
-				"name": &memdb.IndexSchema{
-					Name:    "name",
-					Unique:  false,
-					Indexer: &PayloadIndex{Field: "name"},
-				},
-				"all": &memdb.IndexSchema{
-					Name:    "all",
-					Unique:  false,
-					Indexer: &PayloadIndex{Field: "all"},
-				},
-			},
-		},
-	},
-}
 
 func contextAndDelegated(nodeID string, config moleculer.Config) (moleculer.BrokerContext, *moleculer.BrokerDelegates) {
 	dl := test.DelegatesWithIdAndConfig(nodeID, config)
@@ -54,7 +21,10 @@ func contextAndDelegated(nodeID string, config moleculer.Config) (moleculer.Brok
 var _ = Describe("Moleculer DB Mixin", func() {
 
 	Describe("list action", func() {
-		adapter := memoryAdapter("user", userDbSchema)
+		adapter := &MemoryAdapter{
+			Table:        "user",
+			SearchFields: []string{"name"},
+		}
 
 		//var johnSnow, marie, johnTravolta moleculer.Payload
 		BeforeEach(func() {
@@ -85,7 +55,10 @@ var _ = Describe("Moleculer DB Mixin", func() {
 	})
 
 	Describe("find action", func() {
-		adapter := memoryAdapter("user", userDbSchema)
+		adapter := &MemoryAdapter{
+			Table:        "user",
+			SearchFields: []string{"name"},
+		}
 
 		BeforeEach(func() {
 			mocks.ConnectAndLoadUsers(adapter)
@@ -226,7 +199,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			})
 			params := payload.New(M{"": ""})
 			settingsPopulates := M{"master": "users.get"}
-			mcalls := createPopulateMCalls(result, params, settingsPopulates)
+			mcalls := createPopulateMCalls(result, params, settingsPopulates, []string{"master"})
 
 			r := payload.New(mcalls)
 			Expect(r.Get(userID + "_master_users.get").Exists()).Should(BeTrue())
@@ -245,7 +218,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			})
 			params := payload.New(M{"": ""})
 			settingsPopulates := M{"friends": "users.get"}
-			mcalls := createPopulateMCalls(result, params, settingsPopulates)
+			mcalls := createPopulateMCalls(result, params, settingsPopulates, []string{"friends"})
 
 			r := payload.New(mcalls)
 			Expect(r.Get(userID + "_friends_users.get").Exists()).Should(BeTrue())
@@ -274,7 +247,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			settingsPopulates := M{"friends": "users.get"}
 
 			users := payload.New([]moleculer.Payload{user1, user2})
-			mcalls := createPopulateMCalls(users, params, settingsPopulates)
+			mcalls := createPopulateMCalls(users, params, settingsPopulates, []string{"friends"})
 
 			r := payload.New(mcalls)
 			Expect(r.Get(userID1 + "_friends_users.get").Exists()).Should(BeTrue())
@@ -313,7 +286,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 					}),
 				}),
 			}
-			r := populateSingleRecordWithResults(populates, result, calls)
+			r := populateSingleRecordWithResults(populates, result, calls, []string{"friends"})
 			Expect(r.Exists()).Should(BeTrue())
 			Expect(r.IsError()).Should(BeFalse())
 			Expect(r.Get("id").String()).Should(Equal("12345"))
@@ -338,7 +311,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 					"name": "Yoda",
 				}),
 			}
-			r := populateSingleRecordWithResults(populates, result, calls)
+			r := populateSingleRecordWithResults(populates, result, calls, []string{"master"})
 			Expect(r.Exists()).Should(BeTrue())
 			Expect(r.IsError()).Should(BeFalse())
 			Expect(r.Get("id").String()).Should(Equal("12345"))
@@ -368,7 +341,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 					"name": "Gandalf",
 				}),
 			}
-			r := populateRecordsWithResults(populates, result, calls)
+			r := populateRecordsWithResults(populates, result, calls, []string{"master"})
 			Expect(r.Exists()).Should(BeTrue())
 			Expect(r.IsArray()).Should(BeTrue())
 			Expect(r.IsError()).Should(BeFalse())
@@ -385,7 +358,10 @@ var _ = Describe("Moleculer DB Mixin", func() {
 	})
 
 	Describe("get action", func() {
-		adapter := memoryAdapter("user", userDbSchema)
+		adapter := &MemoryAdapter{
+			Table:        "user",
+			SearchFields: []string{"name"},
+		}
 		var johnSnow, maria moleculer.Payload
 		BeforeEach(func() {
 			johnSnow, maria, _ = mocks.ConnectAndLoadUsers(adapter)
@@ -437,7 +413,10 @@ var _ = Describe("Moleculer DB Mixin", func() {
 	})
 
 	Describe("create action", func() {
-		adapter := memoryAdapter("user", userDbSchema)
+		adapter := &MemoryAdapter{
+			Table:        "user",
+			SearchFields: []string{"name"},
+		}
 		ctx, delegates := contextAndDelegated("create-test", moleculer.Config{})
 		var broadCastReceived moleculer.BrokerContext
 		delegates.BroadcastEvent = func(context moleculer.BrokerContext) {
@@ -486,7 +465,10 @@ var _ = Describe("Moleculer DB Mixin", func() {
 	})
 
 	Describe("update action", func() {
-		adapter := memoryAdapter("user", userDbSchema)
+		adapter := &MemoryAdapter{
+			Table:        "user",
+			SearchFields: []string{"name"},
+		}
 		ctx, delegates := contextAndDelegated("create-test", moleculer.Config{})
 		var broadCastReceived moleculer.BrokerContext
 		delegates.BroadcastEvent = func(context moleculer.BrokerContext) {
@@ -541,7 +523,10 @@ var _ = Describe("Moleculer DB Mixin", func() {
 	})
 
 	Describe("removed action", func() {
-		adapter := memoryAdapter("user", userDbSchema)
+		adapter := &MemoryAdapter{
+			Table:        "user",
+			SearchFields: []string{"name"},
+		}
 		ctx, delegates := contextAndDelegated("create-test", moleculer.Config{})
 		var broadCastReceived moleculer.BrokerContext
 		delegates.BroadcastEvent = func(context moleculer.BrokerContext) {

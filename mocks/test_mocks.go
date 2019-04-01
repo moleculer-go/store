@@ -36,6 +36,7 @@ func ConnectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload,
 		"name":     "John",
 		"lastname": "Travolta",
 		"age":      65,
+		"master":   johnSnow.Get("id").String(),
 		"friends":  []string{johnSnow.Get("id").String(), marie.Get("id").String()},
 	}))
 

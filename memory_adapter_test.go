@@ -11,7 +11,10 @@ import (
 
 var _ = Describe("MemoryAdapter", func() {
 
-	adapter := memoryAdapter("user", userDbSchema)
+	adapter := &MemoryAdapter{
+		Table:        "user",
+		SearchFields: []string{"name"},
+	}
 
 	var johnSnow, johnTravolta moleculer.Payload
 	BeforeEach(func() {
@@ -30,7 +33,7 @@ var _ = Describe("MemoryAdapter", func() {
 		}))
 		Expect(r.IsError()).Should(BeFalse())
 		Expect(r.Len()).Should(Equal(2))
-		Expect(snap.SnapshotMulti("Find()", r.Remove("id", "friends"))).Should(Succeed())
+		Expect(snap.SnapshotMulti("Find()", r.Remove("id", "friends", "master"))).Should(Succeed())
 	})
 
 	It("FindById() should return one matching records by ID", func() {
@@ -43,7 +46,7 @@ var _ = Describe("MemoryAdapter", func() {
 		r := adapter.FindByIds(payload.EmptyList().AddItem(johnSnow.Get("id")).AddItem(johnTravolta.Get("id")))
 		Expect(r.IsError()).Should(BeFalse())
 		Expect(r.Len()).Should(Equal(2))
-		Expect(snap.SnapshotMulti("FindByIds()", r.Remove("id", "friends"))).Should(Succeed())
+		Expect(snap.SnapshotMulti("FindByIds()", r.Remove("id", "friends", "master"))).Should(Succeed())
 	})
 
 	It("Count() should return matching records", func() {

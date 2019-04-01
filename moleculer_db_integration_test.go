@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -32,7 +33,13 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			Collection: "user",
 		}
 		userService := moleculer.Service{
-			Name:   "user",
+			Name: "user",
+			Settings: map[string]interface{}{
+				"populates": map[string]interface{}{
+					"friends": "user.get",
+					"master":  "user.get",
+				},
+			},
 			Mixins: []moleculer.Mixin{db.Mixin(adapter)},
 		}
 
@@ -47,14 +54,12 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		})
 
 		It("get should populate friends field", func() {
-
 			user := <-bkr.Call("user.get", map[string]interface{}{
-				"id": johnT.Get("id").String(),
-				"populates": map[string]interface{}{
-					"friends": "user.get",
-				},
+				"id":       johnT.Get("id").String(),
+				"populate": []string{"friends"},
 			})
 			Expect(user.IsError()).Should(BeFalse())
+			fmt.Println("user --> ", user)
 			Expect(user.Get("name").String()).Should(Equal(johnT.Get("name").String()))
 			Expect(user.Get("friends").Exists()).Should(BeTrue())
 			Expect(user.Get("friends").Len()).Should(Equal(2))
@@ -65,12 +70,10 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			Expect(user.Get("friends").Array()[1].Get("name").String()).Should(Equal(maria.Get("name").String()))
 		})
 
-		It("get should populate friends field", func() {
+		It("get should populate master field", func() {
 			user := <-bkr.Call("user.get", map[string]interface{}{
-				"ids": []string{maria.Get("id").String()},
-				"populates": map[string]interface{}{
-					"master": "user.get",
-				},
+				"ids":      []string{maria.Get("id").String()},
+				"populate": []string{"master"},
 			})
 			Expect(user.Len()).Should(Equal(1))
 
@@ -79,6 +82,29 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			Expect(user.First().Get("master").Exists()).Should(BeTrue())
 			Expect(user.First().Get("master").Get("id").String()).Should(Equal(johnSnow.Get("id").String()))
 			Expect(user.First().Get("master").Get("name").String()).Should(Equal(johnSnow.Get("name").String()))
+		})
+
+		It("get should populate master and friends field", func() {
+			user := <-bkr.Call("user.get", map[string]interface{}{
+				"ids":      []string{johnT.Get("id").String()},
+				"populate": []string{"master", "friends"},
+			})
+			Expect(user.Len()).Should(Equal(1))
+
+			Expect(user.IsError()).Should(BeFalse())
+			user = user.First()
+			Expect(user.Get("name").String()).Should(Equal(johnT.Get("name").String()))
+			Expect(user.Get("master").Exists()).Should(BeTrue())
+			Expect(user.Get("master").Get("id").String()).Should(Equal(johnSnow.Get("id").String()))
+			Expect(user.Get("master").Get("name").String()).Should(Equal(johnSnow.Get("name").String()))
+
+			Expect(user.Get("friends").Exists()).Should(BeTrue())
+			Expect(user.Get("friends").Len()).Should(Equal(2))
+			Expect(user.Get("friends").Array()[0].Get("id").String()).Should(Equal(johnSnow.Get("id").String()))
+			Expect(user.Get("friends").Array()[0].Get("name").String()).Should(Equal(johnSnow.Get("name").String()))
+
+			Expect(user.Get("friends").Array()[1].Get("id").String()).Should(Equal(maria.Get("id").String()))
+			Expect(user.Get("friends").Array()[1].Get("name").String()).Should(Equal(maria.Get("name").String()))
 		})
 
 	})

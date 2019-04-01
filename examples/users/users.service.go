@@ -11,18 +11,16 @@ import (
 )
 
 func main() {
-	var bkr = broker.New(&moleculer.Config{LogLevel: "debug"})
+	var bkr = broker.New(&moleculer.Config{LogLevel: "info"})
 	bkr.AddService(moleculer.Service{
 		Name: "users",
 		Settings: map[string]interface{}{
 			"fields":    []string{"_id", "username", "name"},
 			"populates": map[string]interface{}{"friends": "users.get"},
 		},
-		Mixins: []moleculer.Mixin{db.Mixin(&db.MongoAdapter{
-			MongoURL:   "mongodb://localhost:27017",
-			Collection: "user",
-			Database:   "services",
-			Timeout:    time.Second * 10,
+		Mixins: []moleculer.Mixin{db.Mixin(&db.MemoryAdapter{
+			Table:        "users",
+			SearchFields: []string{"name", "username"},
 		})},
 	})
 	bkr.Start()
@@ -43,10 +41,10 @@ func main() {
 		"pageSize": 10,
 	}))
 
+	idParam := map[string]interface{}{"id": id}
+
 	// Get a user
-	fmt.Printf("get user: ", <-bkr.Call("users.get", map[string]interface{}{
-		"id": id,
-	}))
+	fmt.Printf("get user: ", <-bkr.Call("users.get", idParam))
 
 	// Update a user
 	fmt.Printf("update user: ", <-bkr.Call("users.update", map[string]interface{}{
@@ -55,14 +53,10 @@ func main() {
 	}))
 
 	// Print user after update
-	fmt.Printf("get user: ", <-bkr.Call("users.get", map[string]interface{}{
-		"id": id,
-	}))
+	fmt.Printf("get user: ", <-bkr.Call("users.get", idParam))
 
 	// Delete a user
-	fmt.Printf("remove user: ", <-bkr.Call("users.remove", map[string]interface{}{
-		"id": id,
-	}))
+	fmt.Printf("remove user: ", <-bkr.Call("users.remove", idParam))
 
 	bkr.Stop()
 }
