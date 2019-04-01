@@ -3,8 +3,6 @@
 
 # Official DB addons for Moleculer-Go framework
 
----
-
 Moleculer framework has an official set of [DB adapters](https://github.com/moleculer-go/moleculer-db). Use them to persist your data in a database.
 
 {% note info Database per service%}
