@@ -41,6 +41,7 @@ var defaultSettings = map[string]interface{}{
 }
 
 type Adapter interface {
+	Init(*log.Entry)
 	Connect() error
 	Disconnect() error
 	Find(params moleculer.Payload) moleculer.Payload
@@ -204,18 +205,19 @@ func Mixin(adapter Adapter) moleculer.Mixin {
 			if adapter == nil {
 				settingsAdapter, exists := instance.Settings["db-adapter"]
 				if exists {
-					context.Logger().Debug("db-mixin started. adapter from settings!")
+					context.Logger().Info("db-mixin started - service: ", svc.Name, " -> adapter from settings!")
 					adapter = settingsAdapter.(Adapter)
 				}
 			}
 			if adapter != nil {
-				context.Logger().Info("db-mixin started. adapter.Connect()")
+				context.Logger().Info("db-mixin started - service: ", svc.Name, " -> adapter.Connect()")
+				adapter.Init(context.Logger().WithField("moleculer-db", "adapter"))
 				adapter.Connect()
 			}
 		},
 		Stopped: func(context moleculer.BrokerContext, svc moleculer.Service) {
 			if adapter != nil {
-				context.Logger().Info("db-mixin stopped. adapter.Disconnect()")
+				context.Logger().Info("db-mixin stopped - service: ", svc.Name, " -> adapter.Disconnect()")
 				adapter.Disconnect()
 			}
 		},

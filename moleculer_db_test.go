@@ -26,7 +26,6 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			SearchFields: []string{"name"},
 		}
 
-		//var johnSnow, marie, johnTravolta moleculer.Payload
 		BeforeEach(func() {
 			mocks.ConnectAndLoadUsers(adapter)
 		})

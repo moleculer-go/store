@@ -1,7 +1,6 @@
 package db_test
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -59,7 +58,6 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 				"populate": []string{"friends"},
 			})
 			Expect(user.IsError()).Should(BeFalse())
-			fmt.Println("user --> ", user)
 			Expect(user.Get("name").String()).Should(Equal(johnT.Get("name").String()))
 			Expect(user.Get("friends").Exists()).Should(BeTrue())
 			Expect(user.Get("friends").Len()).Should(Equal(2))

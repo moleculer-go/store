@@ -4,15 +4,18 @@ import (
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/payload"
 	. "github.com/onsi/gomega"
+	log "github.com/sirupsen/logrus"
 )
 
 type Adapter interface {
+	Init(*log.Entry)
 	Connect() error
 	Insert(params moleculer.Payload) moleculer.Payload
 	RemoveAll() moleculer.Payload
 }
 
 func ConnectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload, moleculer.Payload) {
+	adapter.Init(log.WithField("test", "adapter"))
 	err := adapter.Connect()
 	if err != nil {
 		panic(err)

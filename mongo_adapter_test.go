@@ -11,18 +11,21 @@ import (
 	"github.com/moleculer-go/moleculer/payload"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	log "github.com/sirupsen/logrus"
 )
 
 var mongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
 
 func mongoAdapter(database, collection string) *MongoAdapter {
 	fmt.Println("mongoTestsHost: ", mongoTestsHost)
-	return &MongoAdapter{
+	adapter := &MongoAdapter{
 		MongoURL:   mongoTestsHost,
 		Timeout:    2 * time.Second,
 		Database:   database,
 		Collection: collection,
 	}
+	adapter.Init(log.WithField("test", "adapter"))
+	return adapter
 }
 
 type M map[string]interface{}

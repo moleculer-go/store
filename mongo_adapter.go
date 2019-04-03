@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moleculer-go/moleculer/payload"
-
 	"github.com/moleculer-go/moleculer"
+	"github.com/moleculer-go/moleculer/payload"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,6 +24,11 @@ type MongoAdapter struct {
 	Collection string
 	client     *mongo.Client
 	coll       *mongo.Collection
+	logger     *log.Entry
+}
+
+func (adapter *MongoAdapter) Init(logger *log.Entry) {
+	adapter.logger = logger
 }
 
 // Connect connect to mongo, stores the client and the collection.
@@ -31,6 +36,7 @@ func (adapter *MongoAdapter) Connect() error {
 	if adapter.coll != nil {
 		return nil
 	}
+	adapter.logger.Debug("MongoAdapter Connect() MongoURL: ", adapter.MongoURL)
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	var err error
 	adapter.client, err = mongo.Connect(ctx, options.Client().ApplyURI(adapter.MongoURL))
@@ -39,10 +45,18 @@ func (adapter *MongoAdapter) Connect() error {
 	}
 	err = adapter.client.Ping(ctx, readpref.Primary())
 	if err != nil {
+		adapter.logger.Error("MongoAdapter Connect() error on ping - error: ", err)
 		return err
 	}
 	adapter.coll = adapter.client.Database(adapter.Database).Collection(adapter.Collection)
+	adapter.logger.Debug("MongoAdapter Connected !")
 	return nil
+}
+
+func (adapter *MongoAdapter) checkConnected() {
+	if adapter.coll == nil {
+		panic("Adapter not connected!")
+	}
 }
 
 // Disconnect disconnects from mongo.
@@ -146,6 +160,7 @@ func parseFilter(params moleculer.Payload) bson.M {
 }
 
 func (adapter *MongoAdapter) openCursor(params moleculer.Payload) (*mongo.Cursor, context.Context, error) {
+	adapter.checkConnected()
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	filter := parseFilter(params)
 	opts := parseFindOptions(params)
@@ -234,6 +249,7 @@ func (adapter *MongoAdapter) FindByIds(params moleculer.Payload) moleculer.Paylo
 
 // Count count the number of records for the given filter.
 func (adapter *MongoAdapter) Count(params moleculer.Payload) moleculer.Payload {
+	adapter.checkConnected()
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	filter := parseFilter(params)
 	count, err := adapter.coll.CountDocuments(ctx, filter)
@@ -244,6 +260,7 @@ func (adapter *MongoAdapter) Count(params moleculer.Payload) moleculer.Payload {
 }
 
 func (adapter *MongoAdapter) Insert(params moleculer.Payload) moleculer.Payload {
+	adapter.checkConnected()
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	values := params.Bson()
 	res, err := adapter.coll.InsertOne(ctx, values)
@@ -262,6 +279,7 @@ func (adapter *MongoAdapter) Update(params moleculer.Payload) moleculer.Payload 
 }
 
 func (adapter *MongoAdapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
+	adapter.checkConnected()
 	objId, err := primitive.ObjectIDFromHex(id.String())
 	if err != nil {
 		return payload.Error("Cannot update record without id - error: ", err)
@@ -276,6 +294,7 @@ func (adapter *MongoAdapter) UpdateById(id, update moleculer.Payload) moleculer.
 }
 
 func (adapter *MongoAdapter) RemoveById(id moleculer.Payload) moleculer.Payload {
+	adapter.checkConnected()
 	objId, err := primitive.ObjectIDFromHex(id.String())
 	if err != nil {
 		return payload.Error("Cannot update record without id - error: ", err)
@@ -289,6 +308,7 @@ func (adapter *MongoAdapter) RemoveById(id moleculer.Payload) moleculer.Payload 
 }
 
 func (adapter *MongoAdapter) RemoveAll() moleculer.Payload {
+	adapter.checkConnected()
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	res, err := adapter.coll.DeleteMany(ctx, bson.M{})
 	if err != nil {

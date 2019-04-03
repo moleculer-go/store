@@ -9,6 +9,7 @@ import (
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/payload"
 	"github.com/moleculer-go/moleculer/util"
+	log "github.com/sirupsen/logrus"
 )
 
 //MemoryAdapter stores data in memory!
@@ -17,6 +18,11 @@ type MemoryAdapter struct {
 	SearchFields []string
 	Table        string
 	db           *memdb.MemDB
+	logger       *log.Entry
+}
+
+func (adapter *MemoryAdapter) Init(logger *log.Entry) {
+	adapter.logger = logger
 }
 
 func (adapter *MemoryAdapter) generateSchema() *memdb.DBSchema {
