@@ -31,7 +31,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			Database:   "tests",
 			Collection: "user",
 		}
-		userService := moleculer.Service{
+		userService := moleculer.ServiceSchema{
 			Name: "user",
 			Settings: map[string]interface{}{
 				"populates": map[string]interface{}{
@@ -43,7 +43,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		}
 
 		BeforeEach(func() {
-			bkr.AddService(userService)
+			bkr.Publish(userService)
 			bkr.Start()
 			johnSnow, maria, johnT = mocks.ConnectAndLoadUsers(adapter)
 		})
@@ -124,13 +124,13 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			Database:   "tests",
 			Collection: "user",
 		}
-		userService := moleculer.Service{
+		userService := moleculer.ServiceSchema{
 			Name:   "user",
 			Mixins: []moleculer.Mixin{db.Mixin(adapter)},
 		}
 
 		BeforeEach(func() {
-			bkr.AddService(userService)
+			bkr.Publish(userService)
 			bkr.Start()
 			johnSnow, marie, johnT = mocks.ConnectAndLoadUsers(adapter)
 			Expect(johnSnow.IsError()).Should(BeFalse())

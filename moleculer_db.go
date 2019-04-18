@@ -69,7 +69,7 @@ func settingsDefaults(settings map[string]interface{}) (fields []string, populat
 	return fields, populates
 }
 
-func transformResult(ctx moleculer.Context, params, result moleculer.Payload, getInstance func() *moleculer.Service) moleculer.Payload {
+func transformResult(ctx moleculer.Context, params, result moleculer.Payload, getInstance func() *moleculer.ServiceSchema) moleculer.Payload {
 	instance := getInstance()
 	fields, populates := settingsDefaults(instance.Settings)
 	return populateFields(ctx, constrainFields(
@@ -78,14 +78,14 @@ func transformResult(ctx moleculer.Context, params, result moleculer.Payload, ge
 }
 
 // findAction
-func findAction(adapter Adapter, getInstance func() *moleculer.Service) moleculer.ActionHandler {
+func findAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		return transformResult(ctx, params, adapter.Find(params), getInstance)
 	}
 }
 
 //createAction
-func createAction(adapter Adapter, getInstance func() *moleculer.Service) moleculer.ActionHandler {
+func createAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		if params == nil || !params.Exists() {
 			return payload.Error("params cannot be empty!")
@@ -100,7 +100,7 @@ func createAction(adapter Adapter, getInstance func() *moleculer.Service) molecu
 }
 
 //updateAction
-func updateAction(adapter Adapter, getInstance func() *moleculer.Service) moleculer.ActionHandler {
+func updateAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		if params == nil || !params.Exists() {
 			return payload.Error("params cannot be empty!")
@@ -118,7 +118,7 @@ func updateAction(adapter Adapter, getInstance func() *moleculer.Service) molecu
 }
 
 //removeAction
-func removeAction(adapter Adapter, getInstance func() *moleculer.Service) moleculer.ActionHandler {
+func removeAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		if params == nil || !params.Exists() {
 			return payload.Error("params cannot be empty!")
@@ -137,7 +137,7 @@ func removeAction(adapter Adapter, getInstance func() *moleculer.Service) molecu
 }
 
 // listAction
-func listAction(adapter Adapter, getInstance func() *moleculer.Service) moleculer.ActionHandler {
+func listAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		var rows moleculer.Payload
 		wg := sync.WaitGroup{}
@@ -171,7 +171,7 @@ func listAction(adapter Adapter, getInstance func() *moleculer.Service) molecule
 }
 
 // getAction
-func getAction(adapter Adapter, getInstance func() *moleculer.Service) moleculer.ActionHandler {
+func getAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		var result moleculer.Payload
 		if params.Get("id").Exists() {
@@ -190,17 +190,17 @@ func getAction(adapter Adapter, getInstance func() *moleculer.Service) moleculer
 
 //Mixin return the Mixin schema for the Moleculer DB Service.
 func Mixin(adapter Adapter) moleculer.Mixin {
-	var instance *moleculer.Service
-	getInstance := func() *moleculer.Service {
+	var instance *moleculer.ServiceSchema
+	getInstance := func() *moleculer.ServiceSchema {
 		return instance
 	}
 	return moleculer.Mixin{
 		Name:     "db-mixin",
 		Settings: defaultSettings,
-		Created: func(svc moleculer.Service, logger *log.Entry) {
+		Created: func(svc moleculer.ServiceSchema, logger *log.Entry) {
 
 		},
-		Started: func(context moleculer.BrokerContext, svc moleculer.Service) {
+		Started: func(context moleculer.BrokerContext, svc moleculer.ServiceSchema) {
 			instance = &svc
 			if adapter == nil {
 				settingsAdapter, exists := instance.Settings["db-adapter"]
@@ -215,7 +215,7 @@ func Mixin(adapter Adapter) moleculer.Mixin {
 				adapter.Connect()
 			}
 		},
-		Stopped: func(context moleculer.BrokerContext, svc moleculer.Service) {
+		Stopped: func(context moleculer.BrokerContext, svc moleculer.ServiceSchema) {
 			if adapter != nil {
 				context.Logger().Info("db-mixin stopped - service: ", svc.Name, " -> adapter.Disconnect()")
 				adapter.Disconnect()

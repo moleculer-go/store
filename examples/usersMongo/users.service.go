@@ -5,6 +5,7 @@ import (
 	"time"
 
 	db "github.com/moleculer-go/moleculer-db"
+	"github.com/spf13/cobra"
 
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/broker"
@@ -14,9 +15,8 @@ import (
 func main() {
 	cli.Start(
 		&moleculer.Config{LogLevel: "info"},
-		func(broker *broker.ServiceBroker) {
-
-			broker.AddService(moleculer.Service{
+		func(broker *broker.ServiceBroker, cmd *cobra.Command) {
+			broker.Publish(moleculer.ServiceSchema{
 				Name: "users",
 				Settings: map[string]interface{}{
 					"fields":    []string{"_id", "username", "name"},

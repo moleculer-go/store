@@ -12,7 +12,7 @@ import (
 
 func main() {
 	var bkr = broker.New(&moleculer.Config{LogLevel: "info"})
-	bkr.AddService(moleculer.Service{
+	bkr.Publish(moleculer.ServiceSchema{
 		Name: "users",
 		Settings: map[string]interface{}{
 			"fields":    []string{"id", "username", "name"},
@@ -26,7 +26,7 @@ func main() {
 	adapter := &db.MemoryAdapter{
 		Table: "posts",
 	}
-	bkr.AddService(moleculer.Service{
+	bkr.Publish(moleculer.ServiceSchema{
 		Name: "posts",
 		Settings: map[string]interface{}{
 			"populates": map[string]interface{}{

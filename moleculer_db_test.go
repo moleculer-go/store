@@ -32,7 +32,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 		AfterEach(func() {
 			adapter.Disconnect()
 		})
-		svc := &moleculer.Service{
+		svc := &moleculer.ServiceSchema{
 			Settings: Mixin(adapter).Settings,
 		}
 		ctx, _ := contextAndDelegated("list-test", moleculer.Config{})
@@ -41,7 +41,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"searchFields": []string{"name"},
 				"search":       "John",
 			})
-			list := listAction(adapter, func() *moleculer.Service { return svc })
+			list := listAction(adapter, func() *moleculer.ServiceSchema { return svc })
 			rs := list(ctx.(moleculer.Context), params)
 			pl := payload.New(rs)
 			pl = pl.Add("rows", pl.Get("rows").Remove("id"))
@@ -66,7 +66,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			adapter.Disconnect()
 		})
 
-		svc := &moleculer.Service{
+		svc := &moleculer.ServiceSchema{
 			Settings: map[string]interface{}{
 				"fields":    []string{"**"},
 				"populates": map[string]interface{}{},
@@ -85,7 +85,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"search":       "John",
 				"fields":       []string{"name"},
 			})
-			find := findAction(adapter, func() *moleculer.Service { return svc })
+			find := findAction(adapter, func() *moleculer.ServiceSchema { return svc })
 			rs := find(ctx.(moleculer.Context), params).(moleculer.Payload)
 			Expect(rs.Len()).Should(Equal(2))
 			Expect(rs.Array()[0].Get("name").String()).Should(Equal("John"))
@@ -101,7 +101,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"search":       "John",
 				"fields":       []string{"name"},
 			})
-			find := findAction(adapter, func() *moleculer.Service { return svc })
+			find := findAction(adapter, func() *moleculer.ServiceSchema { return svc })
 			rs := find(ctx.(moleculer.Context), params).(moleculer.Payload)
 			Expect(rs.Len()).Should(Equal(2))
 			Expect(rs.Array()[0].Get("name").String()).Should(Equal("John"))
@@ -128,7 +128,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"search":       "John",
 				"fields":       []string{"name"},
 			})
-			find := findAction(adapter, func() *moleculer.Service { return svc })
+			find := findAction(adapter, func() *moleculer.ServiceSchema { return svc })
 			rs := find(ctx.(moleculer.Context), params).(moleculer.Payload)
 			Expect(rs.Len()).Should(Equal(2))
 			Expect(rs.Array()[0].Get("name").String()).Should(Equal("John"))
@@ -369,7 +369,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			adapter.Disconnect()
 		})
 
-		svc := &moleculer.Service{
+		svc := &moleculer.ServiceSchema{
 			Settings: map[string]interface{}{
 				"fields":    []string{"**"},
 				"populates": map[string]interface{}{},
@@ -385,7 +385,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			params := payload.New(map[string]interface{}{
 				"id": johnSnow.Get("id").String(),
 			})
-			get := getAction(adapter, func() *moleculer.Service { return svc })
+			get := getAction(adapter, func() *moleculer.ServiceSchema { return svc })
 			rs := get(ctx.(moleculer.Context), params).(moleculer.Payload)
 			Expect(rs.IsError()).Should(BeFalse())
 			Expect(rs.Get("name").String()).Should(Equal(johnSnow.Get("name").String()))
@@ -397,7 +397,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			params := payload.New(map[string]interface{}{
 				"ids": []string{johnSnow.Get("id").String(), maria.Get("id").String()},
 			})
-			get := getAction(adapter, func() *moleculer.Service { return svc })
+			get := getAction(adapter, func() *moleculer.ServiceSchema { return svc })
 			rs := get(ctx.(moleculer.Context), params).(moleculer.Payload)
 			Expect(rs.IsError()).Should(BeFalse())
 			Expect(rs.Len()).Should(Equal(2))
@@ -430,7 +430,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 		})
 
 		It("should faild with empty params", func() {
-			create := createAction(adapter, func() *moleculer.Service { return &moleculer.Service{} })
+			create := createAction(adapter, func() *moleculer.ServiceSchema { return &moleculer.ServiceSchema{} })
 			r := create(ctx.(moleculer.Context), payload.New(nil)).(moleculer.Payload)
 			Expect(r.IsError()).Should(BeTrue())
 			Expect(r.Error().Error()).Should(Equal("params cannot be empty!"))
@@ -445,7 +445,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"name":     "Michael",
 				"lastname": "Jackson",
 			})
-			create := createAction(adapter, func() *moleculer.Service { return &moleculer.Service{} })
+			create := createAction(adapter, func() *moleculer.ServiceSchema { return &moleculer.ServiceSchema{} })
 			r := create(ctx.(moleculer.Context), params).(moleculer.Payload)
 			Expect(r.IsError()).Should(BeFalse())
 			Expect(r.Get("id").Exists()).Should(BeTrue())
@@ -481,7 +481,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 		AfterEach(func() {
 			adapter.Disconnect()
 		})
-		update := updateAction(adapter, func() *moleculer.Service { return &moleculer.Service{} })
+		update := updateAction(adapter, func() *moleculer.ServiceSchema { return &moleculer.ServiceSchema{} })
 
 		It("should fail when missing id param", func() {
 			r := update(ctx.(moleculer.Context), payload.New(map[string]interface{}{"name": "Santa"})).(moleculer.Payload)
@@ -542,7 +542,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 		AfterEach(func() {
 			adapter.Disconnect()
 		})
-		remove := removeAction(adapter, func() *moleculer.Service { return &moleculer.Service{} })
+		remove := removeAction(adapter, func() *moleculer.ServiceSchema { return &moleculer.ServiceSchema{} })
 
 		It("should fail when missing id param", func() {
 			r := remove(ctx.(moleculer.Context), payload.New(map[string]interface{}{})).(moleculer.Payload)
