@@ -22,8 +22,10 @@ type MongoAdapter struct {
 	Timeout    time.Duration
 	Database   string
 	Collection string
+	Indexes    map[string]map[string]interface{}
 	client     *mongo.Client
 	coll       *mongo.Collection
+	db         *mongo.Database
 	logger     *log.Entry
 }
 
@@ -48,9 +50,81 @@ func (adapter *MongoAdapter) Connect() error {
 		adapter.logger.Error("MongoAdapter Connect() error on ping - error: ", err)
 		return err
 	}
-	adapter.coll = adapter.client.Database(adapter.Database).Collection(adapter.Collection)
+	adapter.db = adapter.client.Database(adapter.Database)
+	adapter.coll = adapter.db.Collection(adapter.Collection)
 	adapter.logger.Debug("MongoAdapter Connected !")
+	adapter.createIndexes()
 	return nil
+}
+
+func getIndexType(opt map[string]interface{}) string {
+	t := ""
+	v, ok := opt["type"]
+	if ok {
+		t, ok = v.(string)
+	}
+	return t
+}
+
+func getIndexDirection(opt map[string]interface{}) int {
+	d := 1
+	v, ok := opt["direction"]
+	if ok {
+		d, ok = v.(int)
+	}
+	return d
+}
+
+func getIndexOptions(opts map[string]interface{}) *options.IndexOptions {
+	opt := &options.IndexOptions{}
+	name, ok := opts["name"]
+	if ok {
+		sname, ok := name.(string)
+		if ok {
+			opt.Name = &sname
+		}
+	}
+	background, ok := opts["background"]
+	if ok {
+		bv, ok := background.(bool)
+		if ok {
+			opt.Background = &bv
+		}
+	}
+	unique, ok := opts["unique"]
+	if ok {
+		bv, ok := unique.(bool)
+		if ok {
+			opt.Unique = &bv
+		}
+	}
+	return opt
+}
+
+func (adapter *MongoAdapter) createIndexes() {
+	if adapter.Indexes == nil {
+		return
+	}
+	indexes := []mongo.IndexModel{}
+	for key, options := range adapter.Indexes {
+		indexType := getIndexType(options)
+		var value interface{} = getIndexDirection(options)
+		if indexType != "" {
+			value = indexType
+		}
+		index := mongo.IndexModel{
+			Keys:    primitive.D{primitive.E{Key: key, Value: value}},
+			Options: getIndexOptions(options),
+		}
+		indexes = append(indexes, index)
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
+	rs, err := adapter.coll.Indexes().CreateMany(ctx, indexes)
+	if err != nil {
+		adapter.logger.Error("Error trying to create indexes. error: ", err)
+	}
+	adapter.logger.Debug("createIndexes() results: ", rs)
 }
 
 func (adapter *MongoAdapter) checkConnected() {
