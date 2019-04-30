@@ -178,6 +178,8 @@ func getAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) mol
 			result = adapter.FindById(params.Get("id"))
 		} else if params.Get("ids").Exists() && params.Get("ids").IsArray() {
 			result = adapter.FindByIds(params.Get("ids"))
+		} else if params.Exists() && params.String() != "" {
+			result = adapter.FindById(params)
 		} else {
 			return payload.Error("Invalid parameter. Action get requires the parameter id or ids!")
 		}
