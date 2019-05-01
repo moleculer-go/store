@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/moleculer-go/moleculer"
@@ -25,14 +26,18 @@ type MongoAdapter struct {
 	client     *mongo.Client
 	coll       *mongo.Collection
 	logger     *log.Entry
+	mutex      *sync.Mutex
 }
 
 func (adapter *MongoAdapter) Init(logger *log.Entry) {
 	adapter.logger = logger
+	adapter.mutex = &sync.Mutex{}
 }
 
 // Connect connect to mongo, stores the client and the collection.
 func (adapter *MongoAdapter) Connect() error {
+	adapter.mutex.Lock()
+	defer adapter.mutex.Unlock()
 	if adapter.coll != nil {
 		return nil
 	}
