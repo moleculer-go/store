@@ -36,11 +36,12 @@ func (adapter *MongoAdapter) Init(logger *log.Entry, settings map[string]interfa
 
 // Connect connect to mongo, stores the client and the collection.
 func (adapter *MongoAdapter) Connect() error {
-	adapter.mutex.Lock()
-	defer adapter.mutex.Unlock()
 	if adapter.coll != nil {
 		return nil
 	}
+	adapter.mutex.Lock()
+	defer adapter.mutex.Unlock()
+
 	adapter.logger.Debug("MongoAdapter Connect() MongoURL: ", adapter.MongoURL)
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	var err error
