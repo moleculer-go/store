@@ -39,8 +39,10 @@ func (adapter *MongoAdapter) Connect() error {
 	if adapter.coll != nil {
 		return nil
 	}
-	adapter.mutex.Lock()
-	defer adapter.mutex.Unlock()
+	//Getting weird "unlock of unlocked mutex" errors.. this was added here to avoid
+	// same adater being connected twice
+	// adapter.mutex.Lock()
+	// defer adapter.mutex.Unlock()
 
 	adapter.logger.Debug("MongoAdapter Connect() MongoURL: ", adapter.MongoURL)
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
