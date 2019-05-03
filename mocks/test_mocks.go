@@ -7,15 +7,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type M map[string]interface{}
+
 type Adapter interface {
-	Init(*log.Entry)
+	Init(*log.Entry, map[string]interface{})
 	Connect() error
 	Insert(params moleculer.Payload) moleculer.Payload
 	RemoveAll() moleculer.Payload
 }
 
 func ConnectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload, moleculer.Payload) {
-	adapter.Init(log.WithField("test", "adapter"))
+	adapter.Init(log.WithField("test", "adapter"), M{})
 	err := adapter.Connect()
 	if err != nil {
 		panic(err)

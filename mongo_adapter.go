@@ -29,7 +29,7 @@ type MongoAdapter struct {
 	mutex      *sync.Mutex
 }
 
-func (adapter *MongoAdapter) Init(logger *log.Entry) {
+func (adapter *MongoAdapter) Init(logger *log.Entry, settings map[string]interface{}) {
 	adapter.logger = logger
 	adapter.mutex = &sync.Mutex{}
 }
@@ -235,7 +235,6 @@ func (adapter *MongoAdapter) FindById(params moleculer.Payload) moleculer.Payloa
 	}
 	filter := payload.New(bson.M{
 		"query": bson.M{"_id": objId},
-		"limit": 1,
 	})
 	return adapter.FindOne(filter)
 }

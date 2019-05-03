@@ -21,7 +21,7 @@ type MemoryAdapter struct {
 	logger       *log.Entry
 }
 
-func (adapter *MemoryAdapter) Init(logger *log.Entry) {
+func (adapter *MemoryAdapter) Init(logger *log.Entry, settings map[string]interface{}) {
 	adapter.logger = logger
 }
 

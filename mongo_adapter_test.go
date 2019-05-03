@@ -24,7 +24,7 @@ func mongoAdapter(database, collection string) *MongoAdapter {
 		Database:   database,
 		Collection: collection,
 	}
-	adapter.Init(log.WithField("test", "adapter"))
+	adapter.Init(log.WithField("test", "adapter"), M{})
 	return adapter
 }
 
