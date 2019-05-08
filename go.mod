@@ -6,7 +6,7 @@ require (
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/hashicorp/go-memdb v1.0.1
 	github.com/moleculer-go/cupaloy v2.3.0+incompatible
-	github.com/moleculer-go/moleculer v0.1.0
+	github.com/moleculer-go/moleculer v0.1.1
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
 	github.com/sirupsen/logrus v1.4.1
