@@ -221,7 +221,7 @@ var _ = Describe("Sqlite", func() {
 		})
 
 		It("should Find with limit", func() {
-			//TODO
+			//TODO test CI
 		})
 
 		It("should Find with offset", func() {
