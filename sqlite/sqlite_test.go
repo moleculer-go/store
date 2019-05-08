@@ -1,8 +1,8 @@
 package sqlite
 
 import (
-	"crawshaw.io/sqlite"
-	"crawshaw.io/sqlite/sqlitex"
+	"github.com/moleculer-go/sqlite"
+	"github.com/moleculer-go/sqlite/sqlitex"
 
 	"github.com/moleculer-go/moleculer"
 

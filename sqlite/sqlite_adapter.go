@@ -13,8 +13,8 @@ import (
 
 	"github.com/moleculer-go/moleculer"
 
-	"crawshaw.io/sqlite"
-	"crawshaw.io/sqlite/sqlitex"
+	"github.com/moleculer-go/sqlite"
+	"github.com/moleculer-go/sqlite/sqlitex"
 	log "github.com/sirupsen/logrus"
 )
 
