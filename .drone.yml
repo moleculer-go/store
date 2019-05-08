@@ -35,8 +35,8 @@ steps:
       - go get -v github.com/tidwall/sjson
       - mkdir /usr/local/go/src/github.com/
       - mkdir /usr/local/go/src/github.com/moleculer-go
-      - ln -s /drone/src/ /usr/local/go/src/github.com/moleculer-go/moleculer-db
-      - cd /usr/local/go/src/github.com/moleculer-go/moleculer-db
+      - ln -s /drone/src/ /usr/local/go/src/github.com/moleculer-go/stores
+      - cd /usr/local/go/src/github.com/moleculer-go/stores
       - go get -d ./...
       - ginkgo -r --randomizeAllSpecs --failFast --cover --trace
       - gover ./ coverage.txt

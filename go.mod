@@ -1,4 +1,4 @@
-module github.com/moleculer-go/moleculer-db
+module github.com/moleculer-go/stores
 
 go 1.12
 

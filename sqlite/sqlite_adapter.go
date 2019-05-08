@@ -22,7 +22,7 @@ type Column struct {
 	Type string
 }
 
-type SQLiteAdapter struct {
+type Adapter struct {
 	URI      string
 	Flags    sqlite.OpenFlags
 	PoolSize int
@@ -41,7 +41,7 @@ type SQLiteAdapter struct {
 	idField string
 }
 
-func (a *SQLiteAdapter) Init(log *log.Entry, settings map[string]interface{}) {
+func (a *Adapter) Init(log *log.Entry, settings map[string]interface{}) {
 	a.log = log
 	a.settings = settings
 	if a.Timeout == 0 {
@@ -52,10 +52,13 @@ func (a *SQLiteAdapter) Init(log *log.Entry, settings map[string]interface{}) {
 			return value
 		}
 	}
+	if a.PoolSize == 0 {
+		a.PoolSize = 1
+	}
 	a.loadSettings(a.settings)
 }
 
-func (a *SQLiteAdapter) Connect() error {
+func (a *Adapter) Connect() error {
 	pool, err := sqlitex.Open(a.URI, a.Flags, a.PoolSize)
 	if err != nil {
 		a.log.Error("Could not connect to SQLite - error: ", err)
@@ -70,7 +73,7 @@ func (a *SQLiteAdapter) Connect() error {
 	return nil
 }
 
-func (a *SQLiteAdapter) columnsDefinition() []string {
+func (a *Adapter) columnsDefinition() []string {
 	columns := []string{a.idField + " INTEGER PRIMARY KEY AUTOINCREMENT"}
 	for _, c := range a.Columns {
 		def := c.Name
@@ -82,7 +85,7 @@ func (a *SQLiteAdapter) columnsDefinition() []string {
 	return columns
 }
 
-func (a *SQLiteAdapter) createTable() error {
+func (a *Adapter) createTable() error {
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError().Error()
@@ -100,7 +103,7 @@ func (a *SQLiteAdapter) createTable() error {
 	return nil
 }
 
-func (a *SQLiteAdapter) Disconnect() error {
+func (a *Adapter) Disconnect() error {
 	err := a.pool.Close()
 	if err != nil {
 		a.log.Error("Could not disconnect SQLite - error: ", err)
@@ -113,17 +116,33 @@ func noConnectionError() moleculer.Payload {
 	return payload.Error("No connection availble!. Did you call adapter.Connect() ?")
 }
 
-func (a *SQLiteAdapter) returnConn(conn *sqlite.Conn) {
+func (a *Adapter) returnConn(conn *sqlite.Conn) {
 	a.pool.Put(conn)
 }
 
-func (a *SQLiteAdapter) getConn() *sqlite.Conn {
+func (a *Adapter) getConn() *sqlite.Conn {
 	return a.pool.Get(nil)
+}
+
+func (a *Adapter) updatePairs(param moleculer.Payload) ([]string, []interface{}) {
+	columns := []string{}
+	values := []interface{}{}
+	param.ForEach(func(key interface{}, value moleculer.Payload) bool {
+		col, ok := key.(string)
+		if !ok {
+			a.log.Error("extractFields() key must be string! - key: ", key)
+			return false
+		}
+		columns = append(columns, a.ColName(col)+" = ?")
+		values = append(values, value.Value())
+		return true
+	})
+	return columns, values
 }
 
 // extractFields will parse the payload and extract the column names,
 // and value placeholders -> $name and the list of fields.
-func (a *SQLiteAdapter) insertFields(param moleculer.Payload) ([]string, []interface{}) {
+func (a *Adapter) insertFields(param moleculer.Payload) ([]string, []interface{}) {
 	columns := []string{}
 	values := []interface{}{}
 	param.ForEach(func(key interface{}, value moleculer.Payload) bool {
@@ -139,7 +158,7 @@ func (a *SQLiteAdapter) insertFields(param moleculer.Payload) ([]string, []inter
 	return columns, values
 }
 
-func (a *SQLiteAdapter) populateStmt(stmt *sqlite.Stmt, param moleculer.Payload, fields []string) (err error) {
+func (a *Adapter) populateStmt(stmt *sqlite.Stmt, param moleculer.Payload, fields []string) (err error) {
 	param.ForEach(func(key interface{}, value moleculer.Payload) bool {
 		field, ok := key.(string)
 		if !ok {
@@ -161,7 +180,7 @@ func placeholders(c []string) []string {
 	return p
 }
 
-func (a *SQLiteAdapter) loadSettings(settings map[string]interface{}) {
+func (a *Adapter) loadSettings(settings map[string]interface{}) {
 	idField, hasIdField := settings["idField"].(string)
 	if !hasIdField {
 		idField = "id"
@@ -180,7 +199,32 @@ func (a *SQLiteAdapter) loadSettings(settings map[string]interface{}) {
 	a.idField = idField
 }
 
-func (a *SQLiteAdapter) Insert(param moleculer.Payload) moleculer.Payload {
+func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
+	id := params.Get("id")
+	if !id.Exists() {
+		return payload.Error("Cannot update record without id")
+	}
+	return a.UpdateById(id, params.Remove("id"))
+}
+
+func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
+	conn := a.getConn()
+	if conn == nil {
+		return noConnectionError()
+	}
+	changes, values := a.updatePairs(update)
+	updtStmt := "UPDATE " + a.Table + " SET " + strings.Join(changes, ", ") + " WHERE id=" + id.String() + ";"
+	a.log.Debug(updtStmt)
+	if err := sqlitex.Exec(conn, updtStmt, nil, values...); err != nil {
+		a.log.Error("Error on update: ", err)
+		return payload.New(err)
+	}
+	a.returnConn(conn)
+	a.log.Debug("update done.")
+	return a.FindById(id)
+}
+
+func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
@@ -196,7 +240,24 @@ func (a *SQLiteAdapter) Insert(param moleculer.Payload) moleculer.Payload {
 	return param.Add(a.idField, conn.LastInsertRowID())
 }
 
-func (a *SQLiteAdapter) RemoveById(id moleculer.Payload) moleculer.Payload {
+func (a *Adapter) RemoveAll() moleculer.Payload {
+	conn := a.getConn()
+	if conn == nil {
+		return noConnectionError()
+	}
+	defer a.returnConn(conn)
+
+	delete := "DELETE FROM " + a.Table + " ;"
+	a.log.Debug(delete)
+	if err := sqlitex.Exec(conn, delete, nil); err != nil {
+		a.log.Error("Error on delete: ", err)
+		return payload.New(err)
+	}
+	deletedCount := conn.Changes()
+	return payload.New(map[string]int{"deletedCount": deletedCount})
+}
+
+func (a *Adapter) RemoveById(id moleculer.Payload) moleculer.Payload {
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
@@ -210,7 +271,7 @@ func (a *SQLiteAdapter) RemoveById(id moleculer.Payload) moleculer.Payload {
 		return payload.New(err)
 	}
 	deletedCount := conn.Changes()
-	return payload.Empty().Add("deletedCount", deletedCount)
+	return payload.New(map[string]int{"deletedCount": deletedCount})
 }
 
 func resolveFindOptions(param moleculer.Payload) (limit, offset string, sort []string) {
@@ -270,14 +331,14 @@ func resolveFields(fields []string, param moleculer.Payload) []string {
 	return fields
 }
 
-func (adapter *SQLiteAdapter) FindById(id moleculer.Payload) moleculer.Payload {
+func (adapter *Adapter) FindById(id moleculer.Payload) moleculer.Payload {
 	filter := payload.New(map[string]interface{}{
 		"query": map[string]interface{}{adapter.idField: id.Value()},
 	})
 	return adapter.FindOne(filter)
 }
 
-func (adapter *SQLiteAdapter) FindByIds(params moleculer.Payload) moleculer.Payload {
+func (adapter *Adapter) FindByIds(params moleculer.Payload) moleculer.Payload {
 	if !params.IsArray() {
 		return payload.Error("FindByIds() only support lists!  --> !params.IsArray()")
 	}
@@ -289,23 +350,35 @@ func (adapter *SQLiteAdapter) FindByIds(params moleculer.Payload) moleculer.Payl
 	return r
 }
 
-func (a *SQLiteAdapter) FindOne(params moleculer.Payload) moleculer.Payload {
+func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {
 	params = params.Add("limit", 1)
 	return a.Find(params).First()
 }
 
-func (a *SQLiteAdapter) Find(param moleculer.Payload) moleculer.Payload {
+func (a *Adapter) Count(param moleculer.Payload) moleculer.Payload {
+	return a.query([]string{"COUNT(*) as count"}, param, func(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
+		count := stmt.GetInt64("count")
+		return payload.New(map[string]int64{"count": count})
+	}).First()
+}
+func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
+	fields := resolveFields(a.fields, param)
+	return a.query(fields, param, a.rowToPayload)
+}
+
+type rowFactory func([]string, *sqlite.Stmt) moleculer.Payload
+
+func (a *Adapter) query(fields []string, param moleculer.Payload, mapRow rowFactory) moleculer.Payload {
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
 	}
 	defer a.returnConn(conn)
 
-	fields := resolveFields(a.fields, param)
 	limit, offset, sort := resolveFindOptions(param)
 
 	rows := []moleculer.Payload{}
-	where := a.where(param)
+	where := a.findWhere(param)
 	selec := "SELECT " + strings.Join(fields, ", ") + " FROM " + a.Table
 	if where != "" {
 		selec = selec + " WHERE " + where
@@ -323,7 +396,7 @@ func (a *SQLiteAdapter) Find(param moleculer.Payload) moleculer.Payload {
 
 	a.log.Debug(selec)
 	if err := sqlitex.Exec(conn, selec, func(stmt *sqlite.Stmt) error {
-		rows = append(rows, a.rowToPayload(fields, stmt))
+		rows = append(rows, mapRow(fields, stmt))
 		return nil
 	}); err != nil {
 		a.log.Error("Error on select: ", err)
@@ -332,7 +405,7 @@ func (a *SQLiteAdapter) Find(param moleculer.Payload) moleculer.Payload {
 	return payload.New(rows)
 }
 
-func (a *SQLiteAdapter) columnValue(column string, stmt *sqlite.Stmt) interface{} {
+func (a *Adapter) columnValue(column string, stmt *sqlite.Stmt) interface{} {
 	t := a.columnType(column)
 	if t == "NUMBER" {
 		return stmt.GetFloat(column)
@@ -343,7 +416,7 @@ func (a *SQLiteAdapter) columnValue(column string, stmt *sqlite.Stmt) interface{
 	return stmt.GetText(column)
 }
 
-func (a *SQLiteAdapter) rowToPayload(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
+func (a *Adapter) rowToPayload(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
 	data := map[string]interface{}{}
 	for _, c := range fields {
 		data[c] = a.columnValue(c, stmt)
@@ -351,7 +424,7 @@ func (a *SQLiteAdapter) rowToPayload(fields []string, stmt *sqlite.Stmt) molecul
 	return payload.New(data)
 }
 
-func (a *SQLiteAdapter) columnType(field string) (r string) {
+func (a *Adapter) columnType(field string) (r string) {
 	for _, c := range a.Columns {
 		if c.Name == field {
 			return c.Type
@@ -360,7 +433,7 @@ func (a *SQLiteAdapter) columnType(field string) (r string) {
 	return r
 }
 
-func (a *SQLiteAdapter) wrapValue(cType string, value moleculer.Payload) (r string) {
+func (a *Adapter) wrapValue(cType string, value moleculer.Payload) (r string) {
 	if cType == "TEXT" || cType == "" {
 		return "'" + value.String() + "'"
 	}
@@ -374,7 +447,7 @@ func (a *SQLiteAdapter) wrapValue(cType string, value moleculer.Payload) (r stri
 	return r
 }
 
-func (a *SQLiteAdapter) filterPairs(query moleculer.Payload) (pairs []string) {
+func (a *Adapter) filterPairs(query moleculer.Payload) (pairs []string) {
 	query.ForEach(func(key interface{}, item moleculer.Payload) bool {
 		field := key.(string)
 		value := a.wrapValue(a.columnType(field), item)
@@ -384,7 +457,16 @@ func (a *SQLiteAdapter) filterPairs(query moleculer.Payload) (pairs []string) {
 	return pairs
 }
 
-func (a *SQLiteAdapter) where(params moleculer.Payload) string {
+func (a *Adapter) updateWhere(params moleculer.Payload) string {
+	where := ""
+	queryPairs := a.filterPairs(params)
+	if len(queryPairs) > 0 {
+		where = strings.Join(queryPairs, " AND ")
+	}
+	return where
+}
+
+func (a *Adapter) findWhere(params moleculer.Payload) string {
 	query := payload.Empty()
 	if params.Get("query").Exists() {
 		query = params.Get("query")
@@ -404,7 +486,7 @@ func (a *SQLiteAdapter) where(params moleculer.Payload) string {
 	return where
 }
 
-func (a *SQLiteAdapter) parseSearchFields(params moleculer.Payload) (pairs []string) {
+func (a *Adapter) parseSearchFields(params moleculer.Payload) (pairs []string) {
 	searchFields := params.Get("searchFields")
 	search := params.Get("search")
 	searchValue := ""

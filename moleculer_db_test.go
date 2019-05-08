@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/moleculer-go/moleculer"
-	"github.com/moleculer-go/moleculer-db/mocks"
+	"github.com/moleculer-go/stores/mocks"
 	"github.com/moleculer-go/moleculer/context"
 	"github.com/moleculer-go/moleculer/payload"
 	"github.com/moleculer-go/moleculer/test"

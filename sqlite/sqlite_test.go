@@ -20,7 +20,7 @@ func must(e error) {
 	}
 }
 
-func countTable(adapter *SQLiteAdapter, table string) int {
+func countTable(adapter *Adapter, table string) int {
 	conn := adapter.getConn()
 	defer adapter.returnConn(conn)
 
@@ -36,11 +36,9 @@ func countTable(adapter *SQLiteAdapter, table string) int {
 var _ = Describe("Sqlite", func() {
 
 	It("should create, init connect and disconnect adapter", func() {
-		adapter := SQLiteAdapter{
-			URI:      "file:memory:?mode=memory",
-			Flags:    0,
-			PoolSize: 1,
-			Table:    "session",
+		adapter := Adapter{
+			URI:   "file:memory:?mode=memory",
+			Table: "session",
 			Columns: []Column{
 				{
 					Name: "code",
@@ -55,7 +53,7 @@ var _ = Describe("Sqlite", func() {
 	})
 
 	It("should create an adapter with default idField = id", func() {
-		adapter := SQLiteAdapter{
+		adapter := Adapter{
 			URI:      "file:memory:?mode=memory",
 			Flags:    0,
 			PoolSize: 1,
@@ -82,7 +80,7 @@ var _ = Describe("Sqlite", func() {
 	It("should create an adapter with custom idField", func() {
 		log.SetLevel(log.DebugLevel)
 
-		adapter := SQLiteAdapter{
+		adapter := Adapter{
 			URI:      "file:memory:?mode=memory",
 			Flags:    0,
 			PoolSize: 1,
@@ -109,11 +107,11 @@ var _ = Describe("Sqlite", func() {
 
 	Describe("Insert, find, delete", func() {
 
-		var adapter SQLiteAdapter
+		var adapter Adapter
 		table := "users"
 		var marie moleculer.Payload
 		BeforeEach(func() {
-			adapter = SQLiteAdapter{
+			adapter = Adapter{
 				URI:      "file:memory:?mode=memory",
 				Flags:    0,
 				PoolSize: 1,
@@ -220,6 +218,30 @@ var _ = Describe("Sqlite", func() {
 			Expect(list.Array()[1].Get("email").String()).Should(Equal("mountain@dew.com"))
 		})
 
+		It("should update a record", func() {
+			r := adapter.Update(payload.New(M{
+				"id":    1,
+				"email": "changed@mail.com",
+			}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Get("email").String()).Should(Equal("changed@mail.com"))
+
+		})
+
+		It("should updateById a record", func() {
+			r := adapter.UpdateById(payload.New(1), payload.New(M{
+				"name":    "Vick",
+				"email":   "changed@mail.com",
+				"number":  456756.45676,
+				"integer": 21321322,
+			}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Get("name").String()).Should(Equal("Vick"))
+			Expect(r.Get("email").String()).Should(Equal("changed@mail.com"))
+			Expect(r.Get("number").Float()).Should(Equal(456756.45676))
+			Expect(r.Get("integer").Int()).Should(Equal(21321322))
+		})
+
 		It("should delete a record", func() {
 			count := countTable(&adapter, "users")
 			Expect(count).Should(Equal(1))
@@ -233,9 +255,9 @@ var _ = Describe("Sqlite", func() {
 
 	})
 
-	Describe("", func() {
+	Describe("Find options", func() {
 
-		adapter := SQLiteAdapter{
+		adapter := Adapter{
 			URI:      "file:memory:?mode=memory",
 			Flags:    0,
 			PoolSize: 1,
@@ -385,6 +407,22 @@ var _ = Describe("Sqlite", func() {
 			Expect(r.Len()).Should(Equal(2))
 			Expect(r.Array()[0].Get("name").String()).Should(Equal("Anderson"))
 			Expect(r.Array()[1].Get("name").String()).Should(Equal("Zabib"))
+		})
+
+		It("should Count the number of records", func() {
+			r := adapter.Count(payload.Empty())
+			Expect(r.Get("count").Int()).Should(Equal(6))
+		})
+
+		It("should RemoveAll remove all records", func() {
+			r := adapter.Count(payload.Empty())
+			Expect(r.Get("count").Int()).Should(Equal(6))
+
+			r = adapter.RemoveAll()
+			Expect(r.Get("deletedCount").Int()).Should(Equal(6))
+
+			r = adapter.Count(payload.Empty())
+			Expect(r.Get("count").Int()).Should(Equal(0))
 		})
 
 	})

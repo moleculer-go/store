@@ -6,8 +6,8 @@ import (
 
 	snap "github.com/moleculer-go/cupaloy"
 	"github.com/moleculer-go/moleculer"
-	db "github.com/moleculer-go/moleculer-db"
-	"github.com/moleculer-go/moleculer-db/mocks"
+	db "github.com/moleculer-go/stores"
+	"github.com/moleculer-go/stores/mocks"
 	"github.com/moleculer-go/moleculer/broker"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
