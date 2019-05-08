@@ -8,7 +8,7 @@ import (
 
 	"strconv"
 
-	"github.com/moleculer-go/moleculer/payload" 
+	"github.com/moleculer-go/moleculer/payload"
 
 	"github.com/moleculer-go/moleculer"
 
@@ -230,7 +230,7 @@ func resolveFindOptions(param moleculer.Payload) (limit, offset string, sort []s
 	return limit, offset, sort
 }
 
-func sortsFromString(sort moleculer.Payload)  []string {
+func sortsFromString(sort moleculer.Payload) []string {
 	parts := strings.Split(strings.Trim(sort.String(), " "), " ")
 	if len(parts) > 1 {
 		sorts := []string{}
@@ -257,7 +257,7 @@ func sortsFromStringArray(sort moleculer.Payload) []string {
 func sortEntry(entry string) string {
 	if strings.Index(entry, "-") == 0 {
 		entry = strings.Replace(entry, "-", "", 1) + " DESC"
-	} else{
+	} else {
 		entry = strings.Replace(entry, "-", "", 1) + " ASC"
 	}
 	return entry
@@ -305,20 +305,20 @@ func (a *SQLiteAdapter) Find(param moleculer.Payload) moleculer.Payload {
 	limit, offset, sort := resolveFindOptions(param)
 
 	rows := []moleculer.Payload{}
-	where := a.where(param) 
+	where := a.where(param)
 	selec := "SELECT " + strings.Join(fields, ", ") + " FROM " + a.Table
 	if where != "" {
-		selec = selec + " WHERE " + where 
-	} 
+		selec = selec + " WHERE " + where
+	}
 	if len(sort) > 0 {
-		selec = selec + " ORDER BY " + strings.Join( sort , ", ")
-	} 
+		selec = selec + " ORDER BY " + strings.Join(sort, ", ")
+	}
 	if limit != "" {
-		selec = selec + " LIMIT " + limit 
-	} 
+		selec = selec + " LIMIT " + limit
+	}
 	if offset != "" {
-		selec = selec + " OFFSET " + offset 
-	} 
+		selec = selec + " OFFSET " + offset
+	}
 	selec = selec + " ;"
 
 	a.log.Debug(selec)
@@ -390,16 +390,16 @@ func (a *SQLiteAdapter) where(params moleculer.Payload) string {
 		query = params.Get("query")
 	}
 	where := ""
-	queryPairs :=  a.filterPairs(query) 
+	queryPairs := a.filterPairs(query)
 	if len(queryPairs) > 0 {
-		where = strings.Join( queryPairs, " AND " )
+		where = strings.Join(queryPairs, " AND ")
 	}
 	searchPairs := a.parseSearchFields(params)
 	if len(searchPairs) > 0 {
 		if where != "" {
 			where = where + " AND "
 		}
-		where = where + "(" + strings.Join( searchPairs, " OR " )  + ")"
+		where = where + "(" + strings.Join(searchPairs, " OR ") + ")"
 	}
 	return where
 }
@@ -415,7 +415,7 @@ func (a *SQLiteAdapter) parseSearchFields(params moleculer.Payload) (pairs []str
 		if searchFields.IsArray() {
 			fields := searchFields.StringArray()
 			for _, field := range fields {
-				pairs = append(pairs, field+" = "+ "'" + searchValue + "'" )
+				pairs = append(pairs, field+" = "+"'"+searchValue+"'")
 			}
 		} else {
 			pairs = []string{searchFields.String() + " = " + "'" + searchValue + "'"}
@@ -423,4 +423,3 @@ func (a *SQLiteAdapter) parseSearchFields(params moleculer.Payload) (pairs []str
 	}
 	return pairs
 }
- 
