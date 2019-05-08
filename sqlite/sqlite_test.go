@@ -220,24 +220,160 @@ var _ = Describe("Sqlite", func() {
 			Expect(list.Array()[1].Get("email").String()).Should(Equal("mountain@dew.com"))
 		})
 
-		It("should Find with limit", func() {
-			//TODO test CI
-		})
+		Describe("", func(){
 
-		It("should Find with offset", func() {
-			//TODO
-		})
+			adapter := SQLiteAdapter{
+				URI:      "file:memory:?mode=memory",
+				Flags:    0,
+				PoolSize: 1,
+				Table:    "testFind",
+				Columns: []Column{
+					{
+						Name: "name",
+						Type: "TEXT",
+					},
+					{
+						Name: "email",
+						Type: "TEXT",
+					},
+				},
+			}
+			
+			BeforeEach( func(){
+				log.SetLevel(log.DebugLevel)
+				adapter.Init(log.WithField("", ""), M{})
+				adapter.Connect()
+				adapter.Insert(payload.New(map[string]string{
+					"name":    "Jackson",
+					"email":   "Jackson@five.com",
+				}))
 
-		It("should Find with sort", func() {
-			//TODO
-		})
+				adapter.Insert(payload.New(map[string]string{
+					"name":    "Michael",
+					"email":   "michael@jackson.com",
+				}))
 
-		It("should Find with searchFields", func() {
-			//TODO
-		})
+				adapter.Insert(payload.New(map[string]string{
+					"name":    "Mario",
+					"email":   "mario@silva.com",
+				}))
 
-		It("should Find with searchFields", func() {
-			//TODO
+				adapter.Insert(payload.New(map[string]string{
+					"name":    "Anderson",
+					"email":   "Zabib",
+				}))
+
+				adapter.Insert(payload.New(map[string]string{
+					"name":    "Connor",
+					"email":   "connor@mc.com",
+				}))
+
+				adapter.Insert(payload.New(map[string]string{
+					"name":    "Zabib",
+					"email":   "zabib@nmgv.com",
+				}))
+
+			})
+
+			AfterEach(func(){
+				adapter.Disconnect()
+			})
+
+			It("should find all", func() {
+				r := adapter.Find(payload.Empty())
+				Expect(r).ShouldNot(BeNil())
+				Expect(r.Len() > 0).Should(BeTrue())
+			})
+
+			It("should Find with limit", func() {
+				r := adapter.Find(payload.New(map[string]interface{}{
+					"limit": 2,
+				}))
+				Expect(r.Len()).Should(Equal(2))
+
+				r = adapter.Find(payload.New(map[string]interface{}{
+					"limit": 3,
+				}))
+				Expect(r.Len()).Should(Equal(3))
+
+				r = adapter.Find(payload.New(map[string]interface{}{
+					"limit": 4,
+				}))
+				Expect(r.Len()).Should(Equal(4))
+
+				r = adapter.Find(payload.New(map[string]interface{}{
+					"limit": 5,
+				}))
+				Expect(r.Len()).Should(Equal(5))
+			})
+
+			It("should Find with offset", func() {
+				r := adapter.Find(payload.New(map[string]interface{}{
+					"offset": 1,
+					"limit": 2,
+				}))
+				Expect(r.Len()).Should(Equal(2))
+				Expect(r.Array()[0].Get("id").Int()).Should(Equal(2))
+				Expect(r.Array()[1].Get("id").Int()).Should(Equal(3))
+
+				r = adapter.Find(payload.New(map[string]interface{}{
+					"offset": 2,
+					"limit": 3,
+				}))
+				Expect(r.Len()).Should(Equal(3))
+				Expect(r.Array()[0].Get("id").Int()).Should(Equal(3))
+				Expect(r.Array()[1].Get("id").Int()).Should(Equal(4))
+
+				r = adapter.Find(payload.New(map[string]interface{}{
+					"offset": 3,
+					"limit": 2,
+				}))
+				Expect(r.Len()).Should(Equal(2))
+				Expect(r.Array()[0].Get("id").Int()).Should(Equal(4))
+				Expect(r.Array()[1].Get("id").Int()).Should(Equal(5))
+
+				r = adapter.Find(payload.New(map[string]interface{}{
+					"offset": 4,
+					"limit": 2,
+				}))
+				Expect(r.Len()).Should(Equal(2))
+				Expect(r.Array()[0].Get("id").Int()).Should(Equal(5))
+				Expect(r.Array()[1].Get("id").Int()).Should(Equal(6))
+			})
+
+			It("should Find with sort", func() {
+				r := adapter.Find(payload.New(map[string]interface{}{
+					"sort": "name",
+				}))
+				Expect(r.Len()).Should(Equal(6))
+				Expect(r.Array()[0].Get("name").String()).Should(Equal("Anderson"))
+				Expect(r.Array()[1].Get("name").String()).Should(Equal("Connor"))
+
+				r = adapter.Find(payload.New(map[string]interface{}{
+					"sort": "-name",
+				}))
+				Expect(r.Len()).Should(Equal(6))
+				Expect(r.Array()[0].Get("name").String()).Should(Equal("Zabib"))
+				Expect(r.Array()[1].Get("name").String()).Should(Equal("Michael"))
+
+				r = adapter.Find(payload.New(map[string]interface{}{
+					"sort": "-id name",
+				}))
+				Expect(r.Len()).Should(Equal(6))
+				Expect(r.Array()[0].Get("name").String()).Should(Equal("Zabib"))
+				Expect(r.Array()[1].Get("name").String()).Should(Equal("Connor"))
+			})
+
+			It("should Find with searchFields", func() {
+				r := adapter.Find(payload.New(map[string]interface{}{
+					"search": "Zabib",
+					"searchFields": []string{"name","email"},
+				}))
+				Expect(r.Len()).Should(Equal(2))
+				Expect(r.Array()[0].Get("name").String()).Should(Equal("Anderson"))
+				Expect(r.Array()[1].Get("name").String()).Should(Equal("Zabib"))
+			})
+
 		})
 
 		It("should delete a record", func() {
