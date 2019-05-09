@@ -201,17 +201,17 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		}
 	})
 
-	testActions("Memory-Adapter", func() store.Adapter {
-		return &store.MemoryAdapter{
-			Table: "user",
-		}
-	})
+	// testActions("Memory-Adapter", func() store.Adapter {
+	// 	return &store.MemoryAdapter{
+	// 		Table: "user",
+	// 	}
+	// })
 
-	testPopulates("Memory-Adapter", func() store.Adapter {
-		return &store.MemoryAdapter{
-			Table: "user",
-		}
-	})
+	// testPopulates("Memory-Adapter", func() store.Adapter {
+	// 	return &store.MemoryAdapter{
+	// 		Table: "user",
+	// 	}
+	// })
 
 	var cols = []sqlite.Column{
 		{

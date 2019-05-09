@@ -14,7 +14,6 @@ import (
 
 //MemoryAdapter stores data in memory!
 type MemoryAdapter struct {
-	//Schema *memdb.DBSchema
 	SearchFields []string
 	Table        string
 	db           *memdb.MemDB
