@@ -1,0 +1,11 @@
+(*payload.RawPayload)((len=5) {
+  "page": 1,
+  "pageSize": 10,
+  "rows": (len=0) {
+
+},
+  "total": (len=1) {
+  "count": 6,
+},
+  "totalPages": 0,
+})

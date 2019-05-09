@@ -1,10 +1,10 @@
-package db
+package stores
 
 import (
 	snap "github.com/moleculer-go/cupaloy"
 	"github.com/moleculer-go/moleculer"
-	"github.com/moleculer-go/stores/mocks"
 	"github.com/moleculer-go/moleculer/payload"
+	"github.com/moleculer-go/stores/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -31,20 +31,20 @@ var _ = Describe("MemoryAdapter", func() {
 			"searchFields": []string{"name"},
 			"search":       "John",
 		}))
-		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Error()).Should(BeNil())
 		Expect(r.Len()).Should(Equal(2))
 		Expect(snap.SnapshotMulti("Find()", r.Remove("id", "friends", "master"))).Should(Succeed())
 	})
 
 	It("FindById() should return one matching records by ID", func() {
 		r := adapter.FindById(johnSnow.Get("id"))
-		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Error()).Should(BeNil())
 		Expect(snap.SnapshotMulti("FindById()", r.Remove("id", "friends"))).Should(Succeed())
 	})
 
 	It("FindByIds() should return one matching records by ID", func() {
 		r := adapter.FindByIds(payload.EmptyList().AddItem(johnSnow.Get("id")).AddItem(johnTravolta.Get("id")))
-		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Error()).Should(BeNil())
 		Expect(r.Len()).Should(Equal(2))
 		Expect(snap.SnapshotMulti("FindByIds()", r.Remove("id", "friends", "master"))).Should(Succeed())
 	})
@@ -54,7 +54,7 @@ var _ = Describe("MemoryAdapter", func() {
 			"searchFields": []string{"name"},
 			"search":       "John",
 		}))
-		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Error()).Should(BeNil())
 		Expect(r.Int()).Should(Equal(2))
 		Expect(snap.SnapshotMulti("Count()", r)).Should(Succeed())
 	})
@@ -64,7 +64,7 @@ var _ = Describe("MemoryAdapter", func() {
 			"id":  johnTravolta.Get("id").String(),
 			"age": 67,
 		}))
-		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Error()).Should(BeNil())
 		Expect(r.Get("name").String()).Should(Equal("John"))
 		Expect(r.Get("lastname").String()).Should(Equal("Travolta"))
 		Expect(r.Get("age").Int()).Should(Equal(67))
@@ -75,7 +75,7 @@ var _ = Describe("MemoryAdapter", func() {
 			"name":     "Julio",
 			"lastname": "Cesar",
 		}))
-		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Error()).Should(BeNil())
 		Expect(r.Get("name").String()).Should(Equal("Julio"))
 		Expect(r.Get("lastname").String()).Should(Equal("Cesar"))
 
@@ -83,7 +83,7 @@ var _ = Describe("MemoryAdapter", func() {
 			"searchFields": []string{"name"},
 			"search":       "Julio",
 		}))
-		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Error()).Should(BeNil())
 		Expect(r.Len()).Should(Equal(1))
 		Expect(snap.SnapshotMulti("Insert()", r.Remove("id"))).Should(Succeed())
 	})
@@ -93,7 +93,7 @@ var _ = Describe("MemoryAdapter", func() {
 		Expect(total.Int()).Should(Equal(6))
 
 		count := adapter.RemoveAll()
-		Expect(count.IsError()).Should(BeFalse())
+		Expect(count.Error()).Should(BeNil())
 		Expect(count.Int()).Should(Equal(6))
 
 		total = adapter.Count(payload.Empty())

@@ -22,20 +22,24 @@ func ConnectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload,
 	if err != nil {
 		panic(err)
 	}
+	return LoadUsers(adapter)
+}
+
+func LoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload, moleculer.Payload) {
 	adapter.RemoveAll()
 	johnSnow := adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "John",
 		"lastname": "Snow",
 		"age":      25,
 	}))
-	Expect(johnSnow.IsError()).Should(BeFalse())
+	Expect(johnSnow.Error()).Should(BeNil())
 	marie := adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "Marie",
 		"lastname": "Claire",
 		"age":      75,
 		"master":   johnSnow.Get("id").String(),
 	}))
-	Expect(marie.IsError()).Should(BeFalse())
+	Expect(marie.Error()).Should(BeNil())
 
 	johnTravolta := adapter.Insert(payload.New(map[string]interface{}{
 		"name":     "John",
@@ -63,6 +67,6 @@ func ConnectAndLoadUsers(adapter Adapter) (moleculer.Payload, moleculer.Payload,
 		"age":      13,
 	}))
 
-	Expect(johnTravolta.IsError()).Should(BeFalse())
+	Expect(johnTravolta.Error()).Should(BeNil())
 	return johnSnow, marie, johnTravolta
 }

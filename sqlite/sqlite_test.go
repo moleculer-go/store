@@ -35,6 +35,7 @@ func countTable(adapter *Adapter, table string) int {
 
 var _ = Describe("Sqlite", func() {
 
+	logLevel := log.ErrorLevel
 	It("should create, init connect and disconnect adapter", func() {
 		adapter := Adapter{
 			URI:   "file:memory:?mode=memory",
@@ -78,7 +79,7 @@ var _ = Describe("Sqlite", func() {
 	})
 
 	It("should create an adapter with custom idField", func() {
-		log.SetLevel(log.DebugLevel)
+		log.SetLevel(logLevel)
 
 		adapter := Adapter{
 			URI:      "file:memory:?mode=memory",
@@ -135,7 +136,7 @@ var _ = Describe("Sqlite", func() {
 					},
 				},
 			}
-			log.SetLevel(log.DebugLevel)
+			log.SetLevel(logLevel)
 			adapter.Init(log.WithField("", ""), M{})
 			adapter.Connect()
 			marie = adapter.Insert(payload.New(M{
@@ -275,7 +276,7 @@ var _ = Describe("Sqlite", func() {
 		}
 
 		BeforeEach(func() {
-			log.SetLevel(log.DebugLevel)
+			log.SetLevel(logLevel)
 			adapter.Init(log.WithField("", ""), M{})
 			adapter.Connect()
 			adapter.Insert(payload.New(map[string]string{

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"strconv"
@@ -33,9 +34,11 @@ type Adapter struct {
 	// from what is passed in the params
 	ColName func(string) string
 
-	pool     *sqlitex.Pool
-	log      *log.Entry
-	settings map[string]interface{}
+	pool *sqlitex.Pool
+
+	connected bool
+	log       *log.Entry
+	settings  map[string]interface{}
 
 	fields  []string
 	idField string
@@ -58,8 +61,37 @@ func (a *Adapter) Init(log *log.Entry, settings map[string]interface{}) {
 	a.loadSettings(a.settings)
 }
 
+var pools map[string]*sqlitex.Pool
+var poolsMutex = &sync.Mutex{}
+
+// Experiment in progress...
+func (a *Adapter) poolFromCache() (*sqlitex.Pool, error) {
+	poolsMutex.Lock()
+	defer poolsMutex.Unlock()
+
+	if pools == nil {
+		pools = map[string]*sqlitex.Pool{}
+	}
+
+	pool, exists := pools[a.URI]
+	if !exists {
+		var err error
+		pool, err = sqlitex.Open(a.URI, a.Flags, a.PoolSize)
+		if err == nil {
+			pools[a.URI] = pool
+		}
+		fmt.Println("** new pool **")
+		return pool, err
+	}
+	fmt.Println("** pool from cache **")
+	return pool, nil
+}
+
 func (a *Adapter) Connect() error {
-	pool, err := sqlitex.Open(a.URI, a.Flags, a.PoolSize)
+	if a.connected {
+		return nil
+	}
+	pool, err := sqlitex.Open(a.URI, a.Flags, a.PoolSize) //a.poolFromCache()
 	if err != nil {
 		a.log.Error("Could not connect to SQLite - error: ", err)
 		return errors.New(fmt.Sprint("Could not connect to SQLite - error: ", err))
@@ -70,6 +102,22 @@ func (a *Adapter) Connect() error {
 		a.log.Error("Could not create table - error: ", err)
 		return errors.New(fmt.Sprint("Could not create table - error: ", err))
 	}
+	a.log.Info("SQLite adapter " + a.Table + " connected!")
+	a.connected = true
+	return nil
+}
+
+func (a *Adapter) Disconnect() error {
+	if !a.connected {
+		return nil
+	}
+	err := a.pool.Close()
+	if err != nil {
+		a.log.Error("Could not disconnect SQLite - error: ", err)
+		return errors.New(fmt.Sprint("Could not disconnect SQLite - error: ", err))
+	}
+	a.pool = nil
+	a.connected = false
 	return nil
 }
 
@@ -103,17 +151,8 @@ func (a *Adapter) createTable() error {
 	return nil
 }
 
-func (a *Adapter) Disconnect() error {
-	err := a.pool.Close()
-	if err != nil {
-		a.log.Error("Could not disconnect SQLite - error: ", err)
-		return errors.New(fmt.Sprint("Could not disconnect SQLite - error: ", err))
-	}
-	return nil
-}
-
 func noConnectionError() moleculer.Payload {
-	return payload.Error("No connection availble!. Did you call adapter.Connect() ?")
+	return payload.Error("No connection availble!. Did you call a.Connect() ?")
 }
 
 func (a *Adapter) returnConn(conn *sqlite.Conn) {
@@ -121,6 +160,9 @@ func (a *Adapter) returnConn(conn *sqlite.Conn) {
 }
 
 func (a *Adapter) getConn() *sqlite.Conn {
+	if a.pool == nil {
+		panic("Adapter not connected!")
+	}
 	return a.pool.Get(nil)
 }
 
@@ -234,7 +276,7 @@ func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
 	columns, values := a.insertFields(param)
 	insert := "INSERT INTO " + a.Table + " (" + strings.Join(columns, ", ") + ") VALUES(" + strings.Join(placeholders(columns), ", ") + ") ;"
 	if err := sqlitex.Exec(conn, insert, nil, values...); err != nil {
-		a.log.Error("Error on insert: ", err)
+		a.log.Error("Error on insert: ", err, " - values: ", values)
 		return payload.New(err)
 	}
 	return param.Add(a.idField, conn.LastInsertRowID())
@@ -324,27 +366,54 @@ func sortEntry(entry string) string {
 	return entry
 }
 
-func resolveFields(fields []string, param moleculer.Payload) []string {
+func (a *Adapter) resolveFields(fields []string, param moleculer.Payload) []string {
 	if param.Get("fields").Exists() && param.Get("fields").IsArray() {
 		fields = param.Get("fields").StringArray()
+	}
+	fields = a.cleanFields(fields)
+	if len(fields) == 0 {
+		fields = []string{a.idField}
 	}
 	return fields
 }
 
-func (adapter *Adapter) FindById(id moleculer.Payload) moleculer.Payload {
-	filter := payload.New(map[string]interface{}{
-		"query": map[string]interface{}{adapter.idField: id.Value()},
-	})
-	return adapter.FindOne(filter)
+func (a *Adapter) validField(field string) bool {
+	return field != "**" && field != "" && findColumn(field, a.Columns)
 }
 
-func (adapter *Adapter) FindByIds(params moleculer.Payload) moleculer.Payload {
+func findColumn(name string, cols []Column) bool {
+	for _, col := range cols {
+		if col.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *Adapter) cleanFields(fields []string) []string {
+	list := []string{}
+	for _, f := range fields {
+		if a.validField(f) {
+			list = append(list, f)
+		}
+	}
+	return list
+}
+
+func (a *Adapter) FindById(id moleculer.Payload) moleculer.Payload {
+	filter := payload.New(map[string]interface{}{
+		"query": map[string]interface{}{a.idField: id.Value()},
+	})
+	return a.FindOne(filter)
+}
+
+func (a *Adapter) FindByIds(params moleculer.Payload) moleculer.Payload {
 	if !params.IsArray() {
 		return payload.Error("FindByIds() only support lists!  --> !params.IsArray()")
 	}
 	r := payload.EmptyList()
 	params.ForEach(func(idx interface{}, id moleculer.Payload) bool {
-		r = r.AddItem(adapter.FindById(id))
+		r = r.AddItem(a.FindById(id))
 		return true
 	})
 	return r
@@ -362,7 +431,7 @@ func (a *Adapter) Count(param moleculer.Payload) moleculer.Payload {
 	}).First()
 }
 func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
-	fields := resolveFields(a.fields, param)
+	fields := a.resolveFields(a.fields, param)
 	return a.query(fields, param, a.rowToPayload)
 }
 

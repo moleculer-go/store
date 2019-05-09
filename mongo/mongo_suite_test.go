@@ -1,4 +1,4 @@
-package db
+package mongo
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestMoleculerDb(t *testing.T) {
+func TestMongo(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Moleculer DB Unit Tests")
+	RunSpecs(t, "Mongo Suite")
 }
