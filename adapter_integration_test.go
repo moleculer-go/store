@@ -1,7 +1,6 @@
 package store_test
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -117,7 +116,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 	}
 
 	testActions := func(label string, createAdapter func() store.Adapter) {
-		label = label + " mixin actions"
+		label = label + "-actions"
 		Context(label, func() {
 			var johnSnow, marie, johnT moleculer.Payload
 			bkr := broker.New(&moleculer.Config{
@@ -151,7 +150,6 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 
 			It("list records and match with snapshot", func() {
 				rs := <-bkr.Call("user.list", map[string]interface{}{})
-				fmt.Println("list: ", rs.RawMap())
 				Expect(rs.Error()).Should(BeNil())
 				Expect(snap.SnapshotMulti(label+"-list-result", cleanResult(rs))).Should(Succeed())
 			})
