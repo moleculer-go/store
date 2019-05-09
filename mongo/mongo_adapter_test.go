@@ -8,7 +8,7 @@ import (
 	snap "github.com/moleculer-go/cupaloy"
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/payload"
-	"github.com/moleculer-go/stores/mocks"
+	"github.com/moleculer-go/store/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"

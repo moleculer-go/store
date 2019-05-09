@@ -1,4 +1,4 @@
-package stores
+package store
 
 import "github.com/moleculer-go/moleculer"
 

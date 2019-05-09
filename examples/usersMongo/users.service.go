@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	db "github.com/moleculer-go/stores"
+	db "github.com/moleculer-go/store"
 	"github.com/spf13/cobra"
 
 	"github.com/moleculer-go/moleculer"

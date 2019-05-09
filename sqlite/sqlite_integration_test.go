@@ -6,8 +6,8 @@ import (
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/broker"
 	"github.com/moleculer-go/moleculer/payload"
-	"github.com/moleculer-go/stores"
-	"github.com/moleculer-go/stores/sqlite"
+	"github.com/moleculer-go/store"
+	"github.com/moleculer-go/store/sqlite"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -44,7 +44,7 @@ var _ = Describe("Sqlite Integration Test", func() {
 				"fields":    []string{"id", "username", "name"},
 				"populates": map[string]interface{}{"friends": "users.get"},
 			},
-			Mixins: []moleculer.Mixin{stores.Mixin(adapter)},
+			Mixins: []moleculer.Mixin{store.Mixin(adapter)},
 			Started: func(moleculer.BrokerContext, moleculer.ServiceSchema) {
 				marie = adapter.Insert(payload.New(M{
 					"name":     "Marie",

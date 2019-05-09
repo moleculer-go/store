@@ -1,4 +1,4 @@
-package stores_test
+package store_test
 
 import (
 	"fmt"
@@ -8,10 +8,10 @@ import (
 	"github.com/moleculer-go/cupaloy"
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/broker"
-	"github.com/moleculer-go/stores"
-	"github.com/moleculer-go/stores/mocks"
-	"github.com/moleculer-go/stores/mongo"
-	"github.com/moleculer-go/stores/sqlite"
+	store "github.com/moleculer-go/store"
+	"github.com/moleculer-go/store/mocks"
+	"github.com/moleculer-go/store/mongo"
+	"github.com/moleculer-go/store/sqlite"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -32,7 +32,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		return p.Remove("id", "_id", "master", "friends")
 	}
 
-	// testPopulates := func(label string, createAdapter func() stores.Adapter) {
+	// testPopulates := func(label string, createAdapter func() store.Adapter) {
 	// 	Describe(label+" populates", func() {
 	// 		var johnSnow, maria, johnT moleculer.Payload
 	// 		bkr := broker.New(&moleculer.Config{
@@ -48,7 +48,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 	// 					"master":  "user.get",
 	// 				},
 	// 			},
-	// 			Mixins: []moleculer.Mixin{stores.Mixin(adapter)},
+	// 			Mixins: []moleculer.Mixin{store.Mixin(adapter)},
 	// 		}
 
 	// 		BeforeEach(func() {
@@ -117,7 +117,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 	// 	})
 	// }
 
-	testActions := func(label string, createAdapter func() stores.Adapter) {
+	testActions := func(label string, createAdapter func() store.Adapter) {
 		Context(label+" mixin actions", func() {
 			var johnSnow, marie, johnT moleculer.Payload
 			bkr := broker.New(&moleculer.Config{
@@ -127,7 +127,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			adapter := createAdapter()
 			userService := moleculer.ServiceSchema{
 				Name:   "user",
-				Mixins: []moleculer.Mixin{stores.Mixin(adapter)},
+				Mixins: []moleculer.Mixin{store.Mixin(adapter)},
 			}
 
 			BeforeEach(func() {
@@ -182,7 +182,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		})
 	}
 
-	// testPopulates("Mongo-Adapter", func() stores.Adapter {
+	// testPopulates("Mongo-Adapter", func() store.Adapter {
 	// 	return &mongo.MongoAdapter{
 	// 		MongoURL:   mongoTestsHost,
 	// 		Timeout:    time.Second * 5,
@@ -191,7 +191,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 	// 	}
 	// })
 
-	testActions("Mongo-Adapter", func() stores.Adapter {
+	testActions("Mongo-Adapter", func() store.Adapter {
 		return &mongo.MongoAdapter{
 			MongoURL:   mongoTestsHost,
 			Timeout:    time.Second * 5,
@@ -200,7 +200,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		}
 	})
 
-	testActions("SQLite-Adapter", func() stores.Adapter {
+	testActions("SQLite-Adapter", func() store.Adapter {
 		return &sqlite.Adapter{
 			URI:   "file:memory:?mode=memory",
 			Table: "users",

@@ -1,4 +1,4 @@
-package stores
+package store
 
 import (
 	"time"
@@ -7,7 +7,7 @@ import (
 	"github.com/moleculer-go/moleculer/context"
 	"github.com/moleculer-go/moleculer/payload"
 	"github.com/moleculer-go/moleculer/test"
-	"github.com/moleculer-go/stores/mocks"
+	"github.com/moleculer-go/store/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
