@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	snap "github.com/moleculer-go/cupaloy"
+	"github.com/moleculer-go/cupaloy/v2"
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/payload"
 	"github.com/moleculer-go/store/mocks"
@@ -13,6 +13,8 @@ import (
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
+
+var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == ""))
 
 var mongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
 

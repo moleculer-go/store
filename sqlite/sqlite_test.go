@@ -35,7 +35,7 @@ func countTable(adapter *Adapter, table string) int {
 
 var _ = Describe("Sqlite", func() {
 
-	logLevel := log.ErrorLevel
+	logLevel := log.DebugLevel
 	It("should create, init connect and disconnect adapter", func() {
 		adapter := Adapter{
 			URI:   "file:memory:?mode=memory",
@@ -258,24 +258,24 @@ var _ = Describe("Sqlite", func() {
 
 	Describe("Find options", func() {
 
-		adapter := Adapter{
-			URI:      "file:memory:?mode=memory",
-			Flags:    0,
-			PoolSize: 1,
-			Table:    "testFind",
-			Columns: []Column{
-				{
-					Name: "name",
-					Type: "TEXT",
-				},
-				{
-					Name: "email",
-					Type: "TEXT",
-				},
-			},
-		}
-
+		var adapter Adapter
 		BeforeEach(func() {
+			adapter = Adapter{
+				URI:      "file:memory:?mode=memory",
+				Flags:    0,
+				PoolSize: 1,
+				Table:    "testFind",
+				Columns: []Column{
+					{
+						Name: "name",
+						Type: "TEXT",
+					},
+					{
+						Name: "email",
+						Type: "TEXT",
+					},
+				},
+			}
 			log.SetLevel(logLevel)
 			adapter.Init(log.WithField("", ""), M{})
 			adapter.Connect()
@@ -412,18 +412,18 @@ var _ = Describe("Sqlite", func() {
 
 		It("should Count the number of records", func() {
 			r := adapter.Count(payload.Empty())
-			Expect(r.Get("count").Int()).Should(Equal(6))
+			Expect(r.Int()).Should(Equal(6))
 		})
 
 		It("should RemoveAll remove all records", func() {
 			r := adapter.Count(payload.Empty())
-			Expect(r.Get("count").Int()).Should(Equal(6))
+			Expect(r.Int()).Should(Equal(6))
 
 			r = adapter.RemoveAll()
 			Expect(r.Get("deletedCount").Int()).Should(Equal(6))
 
 			r = adapter.Count(payload.Empty())
-			Expect(r.Get("count").Int()).Should(Equal(0))
+			Expect(r.Int()).Should(Equal(0))
 		})
 
 	})

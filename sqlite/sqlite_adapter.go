@@ -193,8 +193,11 @@ func (a *Adapter) insertFields(param moleculer.Payload) ([]string, []interface{}
 			a.log.Error("extractFields() key must be string! - key: ", key)
 			return false
 		}
-		columns = append(columns, a.ColName(col))
-		values = append(values, value.Value())
+		v := a.transformIn(col, value.Value())
+		if v != nil {
+			columns = append(columns, a.ColName(col))
+			values = append(values, v)
+		}
 		return true
 	})
 	return columns, values
@@ -230,13 +233,8 @@ func (a *Adapter) loadSettings(settings map[string]interface{}) {
 
 	fields, hasFields := settings["fields"].([]string)
 	if !hasFields {
-		fields = []string{}
-		for _, c := range a.Columns {
-			fields = append(fields, c.Name)
-		}
+		fields = []string{"**"}
 	}
-	fields = append(fields, idField)
-
 	a.fields = fields
 	a.idField = idField
 }
@@ -366,28 +364,47 @@ func sortEntry(entry string) string {
 	return entry
 }
 
-func (a *Adapter) resolveFields(fields []string, param moleculer.Payload) []string {
+//findFields take the default fields from service settings.
+// check if there are fields as parameters.
+// check if all fields should be included **
+// remove invalid field names
+// always returs at least one field, idField
+func (a *Adapter) findFields(param moleculer.Payload) []string {
+	fields := a.fields
 	if param.Get("fields").Exists() && param.Get("fields").IsArray() {
 		fields = param.Get("fields").StringArray()
 	}
-	fields = a.cleanFields(fields)
-	if len(fields) == 0 {
-		fields = []string{a.idField}
+	if len(fields) == 1 && fields[0] == "**" {
+		fields = []string{}
+		for _, c := range a.Columns {
+			fields = append(fields, c.Name)
+		}
 	}
+	fields = append(a.cleanFields(fields), a.idField)
+	fmt.Println("resolved fields: ", fields, " settings.fields: ", a.fields, " columns: ", a.Columns)
 	return fields
 }
 
 func (a *Adapter) validField(field string) bool {
-	return field != "**" && field != "" && findColumn(field, a.Columns)
+	return field != "**" && field != "" && (hasColumn(field, a.Columns) || field == a.idField)
 }
 
-func findColumn(name string, cols []Column) bool {
+func hasColumn(name string, cols []Column) bool {
 	for _, col := range cols {
 		if col.Name == name {
 			return true
 		}
 	}
 	return false
+}
+
+func findColumn(name string, cols []Column) *Column {
+	for _, col := range cols {
+		if col.Name == name {
+			return &col
+		}
+	}
+	return nil
 }
 
 func (a *Adapter) cleanFields(fields []string) []string {
@@ -420,19 +437,16 @@ func (a *Adapter) FindByIds(params moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {
-	params = params.Add("limit", 1)
-	return a.Find(params).First()
+	return a.Find(params.Add("limit", 1)).First()
 }
 
 func (a *Adapter) Count(param moleculer.Payload) moleculer.Payload {
 	return a.query([]string{"COUNT(*) as count"}, param, func(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
-		count := stmt.GetInt64("count")
-		return payload.New(map[string]int64{"count": count})
+		return payload.New(stmt.GetInt64("count"))
 	}).First()
 }
 func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
-	fields := a.resolveFields(a.fields, param)
-	return a.query(fields, param, a.rowToPayload)
+	return a.query(a.findFields(param), param, a.rowToPayload)
 }
 
 type rowFactory func([]string, *sqlite.Stmt) moleculer.Payload
@@ -471,6 +485,7 @@ func (a *Adapter) query(fields []string, param moleculer.Payload, mapRow rowFact
 		a.log.Error("Error on select: ", err)
 		return payload.New(err)
 	}
+	a.log.Debug("rows: ", rows)
 	return payload.New(rows)
 }
 
@@ -485,18 +500,92 @@ func (a *Adapter) columnValue(column string, stmt *sqlite.Stmt) interface{} {
 	return stmt.GetText(column)
 }
 
+var listSeparator = "||"
+
+func (a *Adapter) transformIn(field string, value interface{}) interface{} {
+	if value == nil {
+		return nil
+	}
+	c := findColumn(field, a.Columns)
+	if c == nil {
+		return nil
+	}
+	t := c.Type
+	if t == "[]string" {
+		list, valid := value.([]string)
+		if !valid {
+			return nil
+		}
+		return strings.Join(list, listSeparator)
+	}
+	if t == "[]int" {
+		list, valid := value.([]int)
+		if !valid {
+			return nil
+		}
+		sList := []string{}
+		for _, v := range list {
+			sList = append(sList, string(v))
+		}
+		return strings.Join(sList, listSeparator)
+	}
+	return value
+}
+
+// transformOut transfor column value on the way of the stmt
+func (a *Adapter) transformOut(field string, value interface{}) interface{} {
+	if value == nil || value == "" {
+		return nil
+	}
+	c := findColumn(field, a.Columns)
+	if c == nil {
+		return nil
+	}
+	t := c.Type
+	if t == "[]string" {
+		return strings.Split(value.(string), listSeparator)
+	}
+	if t == "[]int" {
+		list := []int{}
+		for _, s := range strings.Split(value.(string), listSeparator) {
+			i, err := strconv.Atoi(s)
+			if err != nil {
+				list = append(list, i)
+			}
+		}
+		return list
+	}
+	return value
+}
+
 func (a *Adapter) rowToPayload(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
 	data := map[string]interface{}{}
 	for _, c := range fields {
-		data[c] = a.columnValue(c, stmt)
+		value := a.transformOut(c, a.columnValue(c, stmt))
+		if value != 0 && value != "" {
+			data[c] = value
+		}
 	}
 	return payload.New(data)
+}
+
+func dbType(t string) string {
+	if t == "string" {
+		return "TEXT"
+	}
+	if t == "[]string" {
+		return "TEXT"
+	}
+	if t == "[]integer" {
+		return "TEXT"
+	}
+	return strings.ToUpper(t)
 }
 
 func (a *Adapter) columnType(field string) (r string) {
 	for _, c := range a.Columns {
 		if c.Name == field {
-			return c.Type
+			return dbType(c.Type)
 		}
 	}
 	return r
