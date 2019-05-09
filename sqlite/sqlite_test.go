@@ -35,7 +35,7 @@ func countTable(adapter *Adapter, table string) int {
 
 var _ = Describe("Sqlite", func() {
 
-	logLevel := log.DebugLevel
+	logLevel := log.ErrorLevel
 	It("should create, init connect and disconnect adapter", func() {
 		adapter := Adapter{
 			URI:   "file:memory:?mode=memory",
