@@ -18,7 +18,7 @@ import (
 
 var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == ""))
 
-var logLevel = "Error"
+var logLevel = "error"
 
 var mongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
 
@@ -31,35 +31,36 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 
 	testPopulates := func(label string, createAdapter func() store.Adapter) {
 		label = label + " populates"
-		Describe(label, func() {
+		Context(label, func() {
 			var johnSnow, maria, johnT moleculer.Payload
-			bkr := broker.New(&moleculer.Config{
-				DiscoverNodeID: func() string { return "node_populates" },
-				LogLevel:       logLevel,
-			})
-			adapter := createAdapter()
-			userService := moleculer.ServiceSchema{
-				Name: "user",
-				Settings: map[string]interface{}{
-					"populates": map[string]interface{}{
-						"friends": "user.get",
-						"master":  "user.get",
-					},
-				},
-				Mixins: []moleculer.Mixin{store.Mixin(adapter)},
-			}
+			var bkr *broker.ServiceBroker
 
 			BeforeEach(func() {
+				bkr = broker.New(&moleculer.Config{
+					DiscoverNodeID: func() string { return "node_populates" },
+					LogLevel:       logLevel,
+				})
+				adapter := createAdapter()
+				userService := moleculer.ServiceSchema{
+					Name: "user",
+					Settings: map[string]interface{}{
+						"populates": map[string]interface{}{
+							"friends": "user.get",
+							"master":  "user.get",
+						},
+					},
+					Mixins: []moleculer.Mixin{store.Mixin(adapter)},
+				}
 				bkr.Publish(userService)
 				bkr.Start()
-				johnSnow, maria, johnT = mocks.ConnectAndLoadUsers(adapter)
+				johnSnow, maria, johnT = mocks.LoadUsers(adapter)
 			})
 
 			AfterEach(func() {
 				bkr.Stop()
 			})
 
-			FIt("get should populate friends field", func() {
+			It("get should populate friends field", func() {
 				user := <-bkr.Call("user.get", map[string]interface{}{
 					"id":       johnT.Get("id").String(),
 					"populate": []string{"friends"},
@@ -201,6 +202,12 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 	})
 
 	testActions("Memory-Adapter", func() store.Adapter {
+		return &store.MemoryAdapter{
+			Table: "user",
+		}
+	})
+
+	testPopulates("Memory-Adapter", func() store.Adapter {
 		return &store.MemoryAdapter{
 			Table: "user",
 		}

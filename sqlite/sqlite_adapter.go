@@ -40,8 +40,9 @@ type Adapter struct {
 	log       *log.Entry
 	settings  map[string]interface{}
 
-	fields  []string
-	idField string
+	fields   []string
+	idField  string
+	idColumn *Column
 }
 
 func (a *Adapter) Init(log *log.Entry, settings map[string]interface{}) {
@@ -273,6 +274,8 @@ func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
 
 	columns, values := a.insertFields(param)
 	insert := "INSERT INTO " + a.Table + " (" + strings.Join(columns, ", ") + ") VALUES(" + strings.Join(placeholders(columns), ", ") + ") ;"
+	a.log.Debug(insert)
+	a.log.Debug("values: ", values)
 	if err := sqlitex.Exec(conn, insert, nil, values...); err != nil {
 		a.log.Error("Error on insert: ", err, " - values: ", values)
 		return payload.New(err)
@@ -381,7 +384,6 @@ func (a *Adapter) findFields(param moleculer.Payload) []string {
 		}
 	}
 	fields = append(a.cleanFields(fields), a.idField)
-	fmt.Println("resolved fields: ", fields, " settings.fields: ", a.fields, " columns: ", a.Columns)
 	return fields
 }
 
@@ -539,7 +541,13 @@ func (a *Adapter) transformOut(field string, value interface{}) interface{} {
 	}
 	c := findColumn(field, a.Columns)
 	if c == nil {
-		return nil
+		if field != a.idField {
+			return nil
+		}
+		if a.idColumn == nil {
+			a.idColumn = &Column{a.idField, "string"}
+		}
+		c = a.idColumn
 	}
 	t := c.Type
 	if t == "[]string" {
