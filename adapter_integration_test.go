@@ -151,7 +151,8 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			It("list records and match with snapshot", func() {
 				rs := <-bkr.Call("user.list", map[string]interface{}{})
 				Expect(rs.Error()).Should(BeNil())
-				Expect(snap.SnapshotMulti(label+"-list-result", cleanResult(rs))).Should(Succeed())
+				Expect(snap.SnapshotMulti(label+"-list-atts", cleanResult(rs.Remove("rows")))).Should(Succeed())
+				Expect(snap.SnapshotMulti(label+"-list-rows", cleanResult(rs.Get("rows").Remove("id")))).Should(Succeed())
 			})
 
 			It("create a record and match with snapshot", func() {
@@ -198,18 +199,6 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			Collection: "user",
 		}
 	})
-
-	// testActions("Memory-Adapter", func() store.Adapter {
-	// 	return &store.MemoryAdapter{
-	// 		Table: "user",
-	// 	}
-	// })
-
-	// testPopulates("Memory-Adapter", func() store.Adapter {
-	// 	return &store.MemoryAdapter{
-	// 		Table: "user",
-	// 	}
-	// })
 
 	var cols = []sqlite.Column{
 		{

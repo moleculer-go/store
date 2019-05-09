@@ -37,7 +37,7 @@ var _ = Describe("MemoryAdapter", func() {
 		}))
 		Expect(r.Error()).Should(BeNil())
 		Expect(r.Len()).Should(Equal(2))
-		Expect(snap.SnapshotMulti("Find()", r.Remove("id", "friends", "master"))).Should(Succeed())
+		Expect(snap.SnapshotMulti("Find()", r.Remove("id", "friends", "master").Sort("name"))).Should(Succeed())
 	})
 
 	It("FindById() should return one matching records by ID", func() {
