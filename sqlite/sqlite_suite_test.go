@@ -1,4 +1,4 @@
-package db
+package sqlite
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestMoleculerDb(t *testing.T) {
+func TestSqlite(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Moleculer DB Unit Tests")
+	RunSpecs(t, "Sqlite Suite")
 }

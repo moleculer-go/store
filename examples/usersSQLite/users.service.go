@@ -5,6 +5,7 @@ import (
 	"time"
 
 	db "github.com/moleculer-go/store"
+	"github.com/moleculer-go/store/sqlite"
 	"github.com/spf13/cobra"
 
 	"github.com/moleculer-go/moleculer"
@@ -14,19 +15,31 @@ import (
 
 func main() {
 	cli.Start(
-		&moleculer.Config{LogLevel: "info"},
+		&moleculer.Config{LogLevel: "debug"},
 		func(broker *broker.ServiceBroker, cmd *cobra.Command) {
 			broker.Publish(moleculer.ServiceSchema{
 				Name: "users",
 				Settings: map[string]interface{}{
-					"fields":    []string{"_id", "username", "name"},
+					"fields":    []string{"id", "username", "name"},
 					"populates": map[string]interface{}{"friends": "users.get"},
 				},
-				Mixins: []moleculer.Mixin{db.Mixin(&db.MongoAdapter{
-					MongoURL:   "mongodb://localhost:27017",
-					Collection: "users",
-					Database:   "test",
-					Timeout:    time.Second * 5,
+				Mixins: []moleculer.Mixin{db.Mixin(&sqlite.Adapter{
+					URI:   "file:memory:?mode=memory",
+					Table: "users",
+					Columns: []sqlite.Column{
+						{
+							Name: "username",
+							Type: "string",
+						},
+						{
+							Name: "name",
+							Type: "string",
+						},
+						{
+							Name: "status",
+							Type: "integer",
+						},
+					},
 				})},
 			})
 			broker.Start()

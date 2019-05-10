@@ -1,4 +1,4 @@
-package db
+package store
 
 import (
 	"math"
@@ -41,7 +41,7 @@ var defaultSettings = map[string]interface{}{
 }
 
 type Adapter interface {
-	Init(*log.Entry)
+	Init(*log.Entry, map[string]interface{})
 	Connect() error
 	Disconnect() error
 	Find(params moleculer.Payload) moleculer.Payload
@@ -213,7 +213,7 @@ func Mixin(adapter Adapter) moleculer.Mixin {
 			}
 			if adapter != nil {
 				context.Logger().Info("db-mixin started - service: ", svc.Name, " -> adapter.Connect()")
-				adapter.Init(context.Logger().WithField("moleculer-db", "adapter"))
+				adapter.Init(context.Logger().WithField("moleculer-db", "adapter"), svc.Settings)
 				adapter.Connect()
 			}
 		},

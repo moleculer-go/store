@@ -1,9 +1,10 @@
-package db
+package mongo
 
 import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/moleculer-go/moleculer"
@@ -25,10 +26,12 @@ type MongoAdapter struct {
 	client     *mongo.Client
 	coll       *mongo.Collection
 	logger     *log.Entry
+	mutex      *sync.Mutex
 }
 
-func (adapter *MongoAdapter) Init(logger *log.Entry) {
+func (adapter *MongoAdapter) Init(logger *log.Entry, settings map[string]interface{}) {
 	adapter.logger = logger
+	adapter.mutex = &sync.Mutex{}
 }
 
 // Connect connect to mongo, stores the client and the collection.
@@ -36,6 +39,11 @@ func (adapter *MongoAdapter) Connect() error {
 	if adapter.coll != nil {
 		return nil
 	}
+	//Getting weird "unlock of unlocked mutex" errors.. this was added here to avoid
+	// same adater being connected twice
+	// adapter.mutex.Lock()
+	// defer adapter.mutex.Unlock()
+
 	adapter.logger.Debug("MongoAdapter Connect() MongoURL: ", adapter.MongoURL)
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	var err error
@@ -230,7 +238,6 @@ func (adapter *MongoAdapter) FindById(params moleculer.Payload) moleculer.Payloa
 	}
 	filter := payload.New(bson.M{
 		"query": bson.M{"_id": objId},
-		"limit": 1,
 	})
 	return adapter.FindOne(filter)
 }

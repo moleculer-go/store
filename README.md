@@ -3,7 +3,7 @@
 
 # Official DB addons for Moleculer-Go framework
 
-Moleculer framework has an official set of [DB adapters](https://github.com/moleculer-go/moleculer-db). Use them to persist your data in a database.
+Moleculer framework has an official set of [DB adapters](https://github.com/moleculer-go/stores). Use them to persist your data in a database.
 
 {% note info Database per service%}
 Moleculer follows the _one database per service_ pattern. To learn more about this design pattern and its implications check this [article](https://microservices.io/patterns/data/database-per-service.html).
@@ -32,7 +32,7 @@ Only use this adapter for prototyping and testing. When you are ready to go into
 ### Install
 
 ```bash
-$ go get -u github.com/moleculer-go/moleculer-db
+$ go get -u github.com/moleculer-go/stores
 ```
 
 ### Usage
@@ -44,7 +44,7 @@ import (
  "fmt"
  "time"
 
- db "github.com/moleculer-go/moleculer-db"
+ db "github.com/moleculer-go/stores"
 
  "github.com/moleculer-go/moleculer"
  "github.com/moleculer-go/moleculer/broker"
@@ -105,10 +105,10 @@ func main() {
 #### run the example above with:
 
 ```bash
-$ go run github.com/moleculer-go/moleculer-db/examples/users
+$ go run github.com/moleculer-go/stores/examples/users
 ```
 
-> More examples can be found on [GitHub](https://github.com/moleculer-go/moleculer-db/examples)
+> More examples can be found on [GitHub](https://github.com/moleculer-go/stores/examples)
 
 ## Settings
 
@@ -128,7 +128,7 @@ All DB adapters share a common set of settings:
 
 DB adapters also implement CRUD operations. These actions are public methods and can be called by other services.
 
-### [`find`](https://github.com/moleculer-go/moleculer-db/blob/master/moleculer_db.go#L81) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
+### [`find`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L81) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
 
 Find entities by query.
 
@@ -149,7 +149,7 @@ Find entities by query.
 
 **Type:** `moluculer.Paylod` - List of found entities.
 
-### [`count`](https://github.com/moleculer-go/moleculer-db/blob/master/moleculer_db.go#L261) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
+### [`count`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L261) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
 
 Get count of entities by query.
 
@@ -165,7 +165,7 @@ Get count of entities by query.
 
 **Type:** `Number` - Count of found entities.
 
-### [`list`](https://github.com/moleculer-go/moleculer-db/blob/master/moleculer_db.go#L140) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
+### [`list`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L140) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
 
 List entities by filters and pagination results.
 
@@ -186,7 +186,7 @@ List entities by filters and pagination results.
 
 **Type:** `moleculer.Payload` - List of found entities and count.
 
-### [`create`](https://github.com/moleculer-go/moleculer-db/blob/master/moleculer_db.go#L88)
+### [`create`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L88)
 
 Create a new entity.
 
@@ -198,7 +198,7 @@ Payload with fields to be saved in the new entity record.
 
 **Type:** `moleculer.Payload` - Saved entity.
 
-### [`get`](https://github.com/moleculer-go/moleculer-db/blob/master/moleculer_db.go#L174) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
+### [`get`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L174) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
 
 Get entity by ID.
 
@@ -216,7 +216,7 @@ Get entity by ID.
 
 **Type:** `moleculer.Payload` - Found entity(ies).
 
-### [`update`](https://github.com/moleculer-go/moleculer-db/blob/master/moleculer_db.go#L103)
+### [`update`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L103)
 
 Update an entity by ID.
 
@@ -232,7 +232,7 @@ Update an entity by ID.
 
 **Type:** `moleculer.Payload` - Updated entity.
 
-### [`remove`](https://github.com/moleculer-go/moleculer-db/blob/master/moleculer_db.go#L121)
+### [`remove`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L121)
 
 Remove an entity by ID.
 
@@ -259,7 +259,7 @@ import (
  "fmt"
  "time"
 
- db "github.com/moleculer-go/moleculer-db"
+ db "github.com/moleculer-go/stores"
 
  "github.com/moleculer-go/moleculer"
  "github.com/moleculer-go/moleculer/broker"
@@ -351,7 +351,7 @@ func main() {
 
 ```bash
 run the example above with:
-$ go run github.com/moleculer-go/moleculer-db/examples/populates
+$ go run github.com/moleculer-go/stores/examples/populates
 ```
 
 > The `populate` parameter is available in `find`, `list` and `get` actions.
@@ -367,7 +367,7 @@ import (
  "fmt"
  "time"
 
- db "github.com/moleculer-go/moleculer-db"
+ db "github.com/moleculer-go/stores"
 
  "github.com/moleculer-go/moleculer"
  "github.com/moleculer-go/moleculer/broker"
@@ -467,7 +467,7 @@ func main() {
 
 ```bash
 run the example above with:
-$ go run github.com/moleculer-go/moleculer-db/examples/customActions
+$ go run github.com/moleculer-go/stores/examples/customActions
 ```
 
 ## Cache
@@ -482,7 +482,7 @@ This adapter is based on [MongoDB](https://go.mongodb.org/mongo-driver/).
 ### Install
 
 ```bash
-$ go get -u github.com/moleculer-go/moleculer-db
+$ go get -u github.com/moleculer-go/stores
 ```
 
 {% note info Dependencies%}
@@ -498,7 +498,7 @@ import (
  "fmt"
  "time"
 
- db "github.com/moleculer-go/moleculer-db"
+ db "github.com/moleculer-go/stores"
 
  "github.com/moleculer-go/moleculer"
  "github.com/moleculer-go/moleculer/broker"
@@ -536,4 +536,4 @@ func main() {
 
 ```
 
-> More MongoDB examples can be found on [GitHub](https://github.com/moleculer-go/moleculer-db/tree/master/examples)
+> More MongoDB examples can be found on [GitHub](https://github.com/moleculer-go/stores/tree/master/examples)

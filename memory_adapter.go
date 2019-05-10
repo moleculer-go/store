@@ -1,4 +1,4 @@
-package db
+package store
 
 import (
 	"errors"
@@ -14,14 +14,13 @@ import (
 
 //MemoryAdapter stores data in memory!
 type MemoryAdapter struct {
-	//Schema *memdb.DBSchema
 	SearchFields []string
 	Table        string
 	db           *memdb.MemDB
 	logger       *log.Entry
 }
 
-func (adapter *MemoryAdapter) Init(logger *log.Entry) {
+func (adapter *MemoryAdapter) Init(logger *log.Entry, settings map[string]interface{}) {
 	adapter.logger = logger
 }
 

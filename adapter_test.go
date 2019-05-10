@@ -1,13 +1,13 @@
-package db
+package store
 
 import (
 	"time"
 
 	"github.com/moleculer-go/moleculer"
-	"github.com/moleculer-go/moleculer-db/mocks"
 	"github.com/moleculer-go/moleculer/context"
 	"github.com/moleculer-go/moleculer/payload"
 	"github.com/moleculer-go/moleculer/test"
+	"github.com/moleculer-go/store/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -17,6 +17,8 @@ func contextAndDelegated(nodeID string, config moleculer.Config) (moleculer.Brok
 	ctx := context.BrokerContext(dl)
 	return ctx, dl
 }
+
+type M map[string]interface{}
 
 var _ = Describe("Moleculer DB Mixin", func() {
 
@@ -287,7 +289,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			}
 			r := populateSingleRecordWithResults(populates, result, calls, []string{"friends"})
 			Expect(r.Exists()).Should(BeTrue())
-			Expect(r.IsError()).Should(BeFalse())
+			Expect(r.Error()).Should(BeNil())
 			Expect(r.Get("id").String()).Should(Equal("12345"))
 			Expect(r.Get("friends").IsArray()).Should(BeTrue())
 			Expect(r.Get("friends").Len()).Should(Equal(2))
@@ -312,7 +314,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			}
 			r := populateSingleRecordWithResults(populates, result, calls, []string{"master"})
 			Expect(r.Exists()).Should(BeTrue())
-			Expect(r.IsError()).Should(BeFalse())
+			Expect(r.Error()).Should(BeNil())
 			Expect(r.Get("id").String()).Should(Equal("12345"))
 			Expect(r.Get("master").IsMap()).Should(BeTrue())
 			Expect(r.Get("master").Get("id").String()).Should(Equal("444"))
@@ -343,7 +345,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			r := populateRecordsWithResults(populates, result, calls, []string{"master"})
 			Expect(r.Exists()).Should(BeTrue())
 			Expect(r.IsArray()).Should(BeTrue())
-			Expect(r.IsError()).Should(BeFalse())
+			Expect(r.Error()).Should(BeNil())
 			Expect(r.First().Get("id").String()).Should(Equal("12345"))
 			Expect(r.First().Get("master").IsMap()).Should(BeTrue())
 			Expect(r.First().Get("master").Get("id").String()).Should(Equal("444"))
@@ -387,7 +389,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			})
 			get := getAction(adapter, func() *moleculer.ServiceSchema { return svc })
 			rs := get(ctx.(moleculer.Context), params).(moleculer.Payload)
-			Expect(rs.IsError()).Should(BeFalse())
+			Expect(rs.Error()).Should(BeNil())
 			Expect(rs.Get("name").String()).Should(Equal(johnSnow.Get("name").String()))
 			Expect(rs.Get("lastname").String()).Should(Equal(johnSnow.Get("lastname").String()))
 			Expect(rs.Get("age").String()).Should(Equal(johnSnow.Get("age").String()))
@@ -399,7 +401,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			})
 			get := getAction(adapter, func() *moleculer.ServiceSchema { return svc })
 			rs := get(ctx.(moleculer.Context), params).(moleculer.Payload)
-			Expect(rs.IsError()).Should(BeFalse())
+			Expect(rs.Error()).Should(BeNil())
 			Expect(rs.Len()).Should(Equal(2))
 			Expect(rs.Array()[0].Get("name").String()).Should(Equal(johnSnow.Get("name").String()))
 			Expect(rs.Array()[0].Get("lastname").String()).Should(Equal(johnSnow.Get("lastname").String()))
@@ -447,7 +449,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			})
 			create := createAction(adapter, func() *moleculer.ServiceSchema { return &moleculer.ServiceSchema{} })
 			r := create(ctx.(moleculer.Context), params).(moleculer.Payload)
-			Expect(r.IsError()).Should(BeFalse())
+			Expect(r.Error()).Should(BeNil())
 			Expect(r.Get("id").Exists()).Should(BeTrue())
 			Expect(r.Get("name").String()).Should(Equal("Michael"))
 			Expect(r.Get("lastname").String()).Should(Equal("Jackson"))
@@ -505,7 +507,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"lastname": "Stark",
 			})
 			r := update(ctx.(moleculer.Context), params).(moleculer.Payload)
-			Expect(r.IsError()).Should(BeFalse())
+			Expect(r.Error()).Should(BeNil())
 			Expect(r.Get("id").Exists()).Should(BeTrue())
 			Expect(r.Get("name").String()).Should(Equal("John"))
 			Expect(r.Get("lastname").String()).Should(Equal("Stark"))
@@ -534,9 +536,9 @@ var _ = Describe("Moleculer DB Mixin", func() {
 		var johnSnow, marie, johnT moleculer.Payload
 		BeforeEach(func() {
 			johnSnow, marie, johnT = mocks.ConnectAndLoadUsers(adapter)
-			Expect(johnSnow.IsError()).Should(BeFalse())
-			Expect(marie.IsError()).Should(BeFalse())
-			Expect(johnT.IsError()).Should(BeFalse())
+			Expect(johnSnow.Error()).Should(BeNil())
+			Expect(marie.Error()).Should(BeNil())
+			Expect(johnT.Error()).Should(BeNil())
 		})
 
 		AfterEach(func() {
@@ -566,7 +568,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"id": johnSnow.Get("id").String(),
 			})
 			r := remove(ctx.(moleculer.Context), params).(moleculer.Payload)
-			Expect(r.IsError()).Should(BeFalse())
+			Expect(r.Error()).Should(BeNil())
 			Expect(r.Get("id").Exists()).Should(BeTrue())
 			Expect(r.Get("deletedCount").Int()).Should(Equal(1))
 
@@ -585,7 +587,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"id": marie.Get("id").String(),
 			})
 			r = remove(ctx.(moleculer.Context), params).(moleculer.Payload)
-			Expect(r.IsError()).Should(BeFalse())
+			Expect(r.Error()).Should(BeNil())
 			Expect(r.Get("id").Exists()).Should(BeTrue())
 			Expect(r.Get("deletedCount").Int()).Should(Equal(1))
 
@@ -604,7 +606,7 @@ var _ = Describe("Moleculer DB Mixin", func() {
 				"id": johnT.Get("id").String(),
 			})
 			r = remove(ctx.(moleculer.Context), params).(moleculer.Payload)
-			Expect(r.IsError()).Should(BeFalse())
+			Expect(r.Error()).Should(BeNil())
 			Expect(r.Get("id").Exists()).Should(BeTrue())
 			Expect(r.Get("deletedCount").Int()).Should(Equal(1))
 

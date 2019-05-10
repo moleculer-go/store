@@ -1,4 +1,4 @@
-package db_test
+package store
 
 import (
 	"testing"
@@ -9,5 +9,5 @@ import (
 
 func TestMoleculerDb(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Moleculer DB Integration Tests")
+	RunSpecs(t, "Moleculer DB Unit Tests")
 }
