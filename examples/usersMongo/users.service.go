@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	db "github.com/moleculer-go/store"
+	"github.com/moleculer-go/store"
+	"github.com/moleculer-go/store/mongo"
 	"github.com/spf13/cobra"
 
 	"github.com/moleculer-go/moleculer"
@@ -22,7 +23,7 @@ func main() {
 					"fields":    []string{"_id", "username", "name"},
 					"populates": map[string]interface{}{"friends": "users.get"},
 				},
-				Mixins: []moleculer.Mixin{db.Mixin(&db.MongoAdapter{
+				Mixins: []moleculer.Mixin{store.Mixin(&mongo.MongoAdapter{
 					MongoURL:   "mongodb://localhost:27017",
 					Collection: "users",
 					Database:   "test",

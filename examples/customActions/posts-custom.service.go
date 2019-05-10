@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	db "github.com/moleculer-go/store"
+	"github.com/moleculer-go/store"
 
 	"github.com/moleculer-go/moleculer"
 	"github.com/moleculer-go/moleculer/broker"
@@ -18,12 +18,12 @@ func main() {
 			"fields":    []string{"id", "username", "name"},
 			"populates": map[string]interface{}{"friends": "users.get"},
 		},
-		Mixins: []moleculer.Mixin{db.Mixin(&db.MemoryAdapter{
+		Mixins: []moleculer.Mixin{store.Mixin(&store.MemoryAdapter{
 			Table:        "users",
 			SearchFields: []string{"name", "username"},
 		})},
 	})
-	adapter := &db.MemoryAdapter{
+	adapter := &store.MemoryAdapter{
 		Table: "posts",
 	}
 	bkr.Publish(moleculer.ServiceSchema{
@@ -41,7 +41,7 @@ func main() {
 				},
 			},
 		},
-		Mixins: []moleculer.Mixin{db.Mixin(adapter)},
+		Mixins: []moleculer.Mixin{store.Mixin(adapter)},
 		Actions: []moleculer.Action{
 			{
 				Name: "byAuthors",

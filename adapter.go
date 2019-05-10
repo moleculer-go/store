@@ -212,8 +212,8 @@ func Mixin(adapter Adapter) moleculer.Mixin {
 				}
 			}
 			if adapter != nil {
-				context.Logger().Info("db-mixin started - service: ", svc.Name, " -> adapter.Connect()")
-				adapter.Init(context.Logger().WithField("moleculer-db", "adapter"), svc.Settings)
+				context.Logger().Info("db adapter started - service: ", svc.Name, " -> adapter.Connect()")
+				adapter.Init(context.Logger().WithField("store", "adapter"), svc.Settings)
 				adapter.Connect()
 			}
 		},

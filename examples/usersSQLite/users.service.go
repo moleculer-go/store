@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	db "github.com/moleculer-go/store"
+	"github.com/moleculer-go/store"
 	"github.com/moleculer-go/store/sqlite"
 	"github.com/spf13/cobra"
 
@@ -23,7 +23,7 @@ func main() {
 					"fields":    []string{"id", "username", "name"},
 					"populates": map[string]interface{}{"friends": "users.get"},
 				},
-				Mixins: []moleculer.Mixin{db.Mixin(&sqlite.Adapter{
+				Mixins: []moleculer.Mixin{store.Mixin(&sqlite.Adapter{
 					URI:   "file:memory:?mode=memory",
 					Table: "users",
 					Columns: []sqlite.Column{

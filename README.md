@@ -1,9 +1,11 @@
-[![Build Status](https://cloud.drone.io/api/badges/moleculer-go/moleculer-db/status.svg)](https://cloud.drone.io/moleculer-go/moleculer-db)
-[![Coverage Status](https://coveralls.io/repos/github/moleculer-go/moleculer-db/badge.svg?branch=feat%2Fmongo-adapter)](https://coveralls.io/github/moleculer-go/moleculer-db?branch=feat%2Fmongo-adapter)
+[![Build Status](https://cloud.drone.io/api/badges/moleculer-go/store/status.svg)](https://cloud.drone.io/moleculer-go/store)
+[![Coverage Status](https://coveralls.io/repos/github/moleculer-go/store/badge.svg?branch=feat%2Fmongo-adapter)](https://coveralls.io/github/moleculer-go/store?branch=feat%2Fmongo-adapter)
 
-# Official DB addons for Moleculer-Go framework
+# Database Adapters (github.com/moleculer-go/store)
 
-Moleculer framework has an official set of [DB adapters](https://github.com/moleculer-go/stores). Use them to persist your data in a database.
+---
+
+Moleculer framework has an official set of [Database adapters](https://github.com/moleculer-go/store). Use them to persist your data in a database.
 
 {% note info Database per service%}
 Moleculer follows the _one database per service_ pattern. To learn more about this design pattern and its implications check this [article](https://microservices.io/patterns/data/database-per-service.html).
@@ -26,13 +28,16 @@ Moleculer follows the _one database per service_ pattern. To learn more about th
 Moleculer's memory adapter uses [hashicorp/go-memdb](https://github.com/hashicorp/go-memdb). Use it to quickly set up and test you prototype and for writing test cases.
 
 {% note warn%}
-Only use this adapter for prototyping and testing. When you are ready to go into production simply swap to [Mongo](moleculer-db.html#Mongo-Adapter) ... adapters as they all implement common [Settings](moleculer-db.html#Settings), [Actions](moleculer-db.html#Actions).
+Only use this adapter for prototyping and testing. When you are ready to go into production simply swap to [Mongo](store.html#Mongo-Adapter) ... adapters as they all implement common [Settings](store.html#Settings), [Actions](store.html#Actions).
 {% endnote %}
 
 ### Install
 
 ```bash
-$ go get -u github.com/moleculer-go/stores
+$ go get -u github.com/moleculer-go/store
+
+# Or with go modules
+github.com/moleculer-go/store v1.0.1
 ```
 
 ### Usage
@@ -41,78 +46,78 @@ $ go get -u github.com/moleculer-go/stores
 package main
 
 import (
- "fmt"
- "time"
+  "fmt"
+  "time"
 
- db "github.com/moleculer-go/stores"
+  "github.com/moleculer-go/store"
 
- "github.com/moleculer-go/moleculer"
- "github.com/moleculer-go/moleculer/broker"
+  "github.com/moleculer-go/moleculer"
+  "github.com/moleculer-go/moleculer/broker"
 )
 
 func main() {
- var bkr = broker.New(&moleculer.Config{LogLevel: "info"})
- bkr.Publish(moleculer.Service{
-  Name: "users",
-  Settings: map[string]interface{}{
-   "fields":    []string{"_id", "username", "name"},
-   "populates": map[string]interface{}{"friends": "users.get"},
-  },
-  Mixins: []moleculer.Mixin{db.Mixin(&db.MemoryAdapter{
-   Table:        "users",
-   SearchFields: []string{"name", "username"},
-  })},
- })
- bkr.Start()
- time.Sleep(time.Millisecond * 300)
- user := <-bkr.Call("users.create", map[string]interface{}{
-  "username": "john",
-  "name":     "John Doe",
-  "status":   1,
- })
+  var bkr = broker.New(&moleculer.Config{LogLevel: "info"})
+  bkr.Publish(moleculer.ServiceSchema{
+    Name: "users",
+    Settings: map[string]interface{}{
+      "fields":    []string{"_id", "username", "name"},
+      "populates": map[string]interface{}{"friends": "users.get"},
+    },
+    Mixins: []moleculer.Mixin{store.Mixin(&store.MemoryAdapter{
+      Table:        "users",
+      SearchFields: []string{"name", "username"},
+    })},
+  })
+  bkr.Start()
+  time.Sleep(time.Millisecond * 300)
+  user := <-bkr.Call("users.create", map[string]interface{}{
+    "username": "john",
+    "name":     "John Doe",
+    "status":   1,
+  })
 
- id := user.Get("id").String()
- // Get all users
- fmt.Printf("all users: ", <-bkr.Call("users.find", map[string]interface{}{}))
+  id := user.Get("id").String()
+  // Get all users
+  fmt.Printf("all users: ", <-bkr.Call("users.find", map[string]interface{}{}))
 
- // List users with pagination
- fmt.Printf("list users: ", <-bkr.Call("users.list", map[string]interface{}{
-  "page":     2,
-  "pageSize": 10,
- }))
+  // List users with pagination
+  fmt.Printf("list users: ", <-bkr.Call("users.list", map[string]interface{}{
+    "page":     2,
+    "pageSize": 10,
+  }))
 
- idParam := map[string]interface{}{"id": id}
+  idParam := map[string]interface{}{"id": id}
 
- // Get a user
- fmt.Printf("get user: ", <-bkr.Call("users.get", idParam))
+  // Get a user
+  fmt.Printf("get user: ", <-bkr.Call("users.get", idParam))
 
- // Update a user
- fmt.Printf("update user: ", <-bkr.Call("users.update", map[string]interface{}{
-  "id":   id,
-  "name": "Jane Doe",
- }))
+  // Update a user
+  fmt.Printf("update user: ", <-bkr.Call("users.update", map[string]interface{}{
+    "id":   id,
+    "name": "Jane Doe",
+  }))
 
- // Print user after update
- fmt.Printf("get user: ", <-bkr.Call("users.get", idParam))
+  // Print user after update
+  fmt.Printf("get user: ", <-bkr.Call("users.get", idParam))
 
- // Delete a user
- fmt.Printf("remove user: ", <-bkr.Call("users.remove", idParam))
+  // Delete a user
+  fmt.Printf("remove user: ", <-bkr.Call("users.remove", idParam))
 
- bkr.Stop()
+  bkr.Stop()
 }
 ```
 
 #### run the example above with:
 
 ```bash
-$ go run github.com/moleculer-go/stores/examples/users
+$ go run github.com/moleculer-go/store/examples/users
 ```
 
-> More examples can be found on [GitHub](https://github.com/moleculer-go/stores/examples)
+> More examples can be found on [GitHub](https://github.com/moleculer-go/store/examples)
 
 ## Settings
 
-All DB adapters share a common set of settings:
+All DB adapters share these common set of settings:
 
 | Property          | Type                     | Default      | Description                                                                                                                           |
 | ----------------- | ------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -128,7 +133,7 @@ All DB adapters share a common set of settings:
 
 DB adapters also implement CRUD operations. These actions are public methods and can be called by other services.
 
-### [`find`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L81) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
+### [`find`](https://github.com/moleculer-go/store/blob/master/store.go#L81) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
 
 Find entities by query.
 
@@ -149,7 +154,7 @@ Find entities by query.
 
 **Type:** `moluculer.Paylod` - List of found entities.
 
-### [`count`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L261) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
+### [`count`](https://github.com/moleculer-go/store/blob/master/store.go#L261) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
 
 Get count of entities by query.
 
@@ -165,7 +170,7 @@ Get count of entities by query.
 
 **Type:** `Number` - Count of found entities.
 
-### [`list`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L140) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
+### [`list`](https://github.com/moleculer-go/store/blob/master/store.go#L140) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
 
 List entities by filters and pagination results.
 
@@ -186,7 +191,7 @@ List entities by filters and pagination results.
 
 **Type:** `moleculer.Payload` - List of found entities and count.
 
-### [`create`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L88)
+### [`create`](https://github.com/moleculer-go/store/blob/master/store.go#L88)
 
 Create a new entity.
 
@@ -198,7 +203,7 @@ Payload with fields to be saved in the new entity record.
 
 **Type:** `moleculer.Payload` - Saved entity.
 
-### [`get`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L174) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
+### [`get`](https://github.com/moleculer-go/store/blob/master/store.go#L174) ![Cached action](https://img.shields.io/badge/cache-true-blue.svg)
 
 Get entity by ID.
 
@@ -216,7 +221,7 @@ Get entity by ID.
 
 **Type:** `moleculer.Payload` - Found entity(ies).
 
-### [`update`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L103)
+### [`update`](https://github.com/moleculer-go/store/blob/master/store.go#L103)
 
 Update an entity by ID.
 
@@ -232,7 +237,7 @@ Update an entity by ID.
 
 **Type:** `moleculer.Payload` - Updated entity.
 
-### [`remove`](https://github.com/moleculer-go/stores/blob/master/moleculer_db.go#L121)
+### [`remove`](https://github.com/moleculer-go/store/blob/master/store.go#L121)
 
 Remove an entity by ID.
 
@@ -259,7 +264,7 @@ import (
  "fmt"
  "time"
 
- db "github.com/moleculer-go/stores"
+ "github.com/moleculer-go/store"
 
  "github.com/moleculer-go/moleculer"
  "github.com/moleculer-go/moleculer/broker"
@@ -273,7 +278,7 @@ func main() {
    "fields":    []string{"id", "username", "name"},
    "populates": map[string]interface{}{"friends": "users.get"},
   },
-  Mixins: []moleculer.Mixin{db.Mixin(&db.MemoryAdapter{
+  Mixins: []moleculer.Mixin{store.Mixin(&store.MemoryAdapter{
    Table:        "users",
    SearchFields: []string{"name", "username"},
   })},
@@ -294,7 +299,7 @@ func main() {
     },
    },
   },
-  Mixins: []moleculer.Mixin{db.Mixin(&db.MemoryAdapter{
+  Mixins: []moleculer.Mixin{store.Mixin(&store.MemoryAdapter{
    Table: "posts",
   })},
  })
@@ -351,7 +356,7 @@ func main() {
 
 ```bash
 run the example above with:
-$ go run github.com/moleculer-go/stores/examples/populates
+$ go run github.com/moleculer-go/store/examples/populates
 ```
 
 > The `populate` parameter is available in `find`, `list` and `get` actions.
@@ -367,7 +372,7 @@ import (
  "fmt"
  "time"
 
- db "github.com/moleculer-go/stores"
+ "github.com/moleculer-go/store"
 
  "github.com/moleculer-go/moleculer"
  "github.com/moleculer-go/moleculer/broker"
@@ -381,12 +386,12 @@ func main() {
    "fields":    []string{"id", "username", "name"},
    "populates": map[string]interface{}{"friends": "users.get"},
   },
-  Mixins: []moleculer.Mixin{db.Mixin(&db.MemoryAdapter{
+  Mixins: []moleculer.Mixin{store.Mixin(&store.MemoryAdapter{
    Table:        "users",
    SearchFields: []string{"name", "username"},
   })},
  })
- adapter := &db.MemoryAdapter{
+ adapter := &store.MemoryAdapter{
   Table: "posts",
  }
  bkr.Publish(moleculer.Service{
@@ -404,7 +409,7 @@ func main() {
     },
    },
   },
-  Mixins: []moleculer.Mixin{db.Mixin(adapter)},
+  Mixins: []moleculer.Mixin{store.Mixin(adapter)},
   Actions: []moleculer.Action{
    {
     Name: "byAuthors",
@@ -467,7 +472,7 @@ func main() {
 
 ```bash
 run the example above with:
-$ go run github.com/moleculer-go/stores/examples/customActions
+$ go run github.com/moleculer-go/store/examples/customActions
 ```
 
 ## Cache
@@ -482,7 +487,10 @@ This adapter is based on [MongoDB](https://go.mongodb.org/mongo-driver/).
 ### Install
 
 ```bash
-$ go get -u github.com/moleculer-go/stores
+$ go get -u github.com/moleculer-go/store
+
+# Or with go modules
+github.com/moleculer-go/store v1.0.1
 ```
 
 {% note info Dependencies%}
@@ -495,45 +503,189 @@ To use this adapter you need to install [MongoDB](https://www.mongodb.com/) on y
 package main
 
 import (
- "fmt"
- "time"
+  "fmt"
+  "time"
 
- db "github.com/moleculer-go/stores"
+  "github.com/moleculer-go/store"
+  "github.com/moleculer-go/store/mongo"
+  "github.com/spf13/cobra"
 
- "github.com/moleculer-go/moleculer"
- "github.com/moleculer-go/moleculer/broker"
+  "github.com/moleculer-go/moleculer"
+  "github.com/moleculer-go/moleculer/broker"
+  "github.com/moleculer-go/moleculer/cli"
 )
 
 func main() {
- var bkr = broker.New(&moleculer.Config{LogLevel: "info"})
- bkr.Publish(moleculer.Service{
-  Name: "users",
-  Settings: map[string]interface{}{
-   "fields":    []string{"_id", "username", "name"},
-   "populates": map[string]interface{}{"friends": "users.get"},
-  },
-  Mixins: []moleculer.Mixin{db.Mixin(&db.MongoAdapter{
-   MongoURL:   "mongodb://localhost:27017",
-   Collection: "users",
-   Database:   "test",
-   Timeout:    time.Second * 5,
-  })},
- })
- bkr.Start()
- time.Sleep(time.Millisecond * 300)
- user := <-bkr.Call("users.create", map[string]interface{}{
-  "username": "john",
-  "name":     "John Doe",
-  "status":   1,
- })
+  cli.Start(
+    &moleculer.Config{LogLevel: "info"},
+    func(broker *broker.ServiceBroker, cmd *cobra.Command) {
+      broker.Publish(moleculer.ServiceSchema{
+        Name: "users",
+        Settings: map[string]interface{}{
+          "fields":    []string{"_id", "username", "name"},
+          "populates": map[string]interface{}{"friends": "users.get"},
+        },
+        Mixins: []moleculer.Mixin{store.Mixin(&mongo.MongoAdapter{
+          MongoURL:   "mongodb://localhost:27017",
+          Collection: "users",
+          Database:   "test",
+          Timeout:    time.Second * 5,
+        })},
+      })
+      broker.Start()
+      time.Sleep(time.Millisecond * 300)
+      user := <-broker.Call("users.create", map[string]interface{}{
+        "username": "john",
+        "name":     "John Doe",
+        "status":   1,
+      })
 
- id := user.Get("id").String()
- // Get all users
- fmt.Printf("all users: ", <-bkr.Call("users.find", map[string]interface{}{}))
- //...
- bkr.Stop()
+      id := user.Get("id").String()
+      // Get all users
+      fmt.Printf("all users: ", <-broker.Call("users.find", map[string]interface{}{}))
+
+      // List users with pagination
+      fmt.Printf("list users: ", <-broker.Call("users.list", map[string]interface{}{
+        "page":     2,
+        "pageSize": 10,
+      }))
+
+      idParam := map[string]interface{}{"id": id}
+
+      // Get a user
+      fmt.Printf("get user: ", <-broker.Call("users.get", idParam))
+
+      // Update a user
+      fmt.Printf("update user: ", <-broker.Call("users.update", map[string]interface{}{
+        "id":   id,
+        "name": "Jane Doe",
+      }))
+
+      // Print user after update
+      fmt.Printf("get user: ", <-broker.Call("users.get", idParam))
+
+      // Delete a user
+      fmt.Printf("remove user: ", <-broker.Call("users.remove", idParam))
+
+      broker.Stop()
+
+    })
 }
-
 ```
 
-> More MongoDB examples can be found on [GitHub](https://github.com/moleculer-go/stores/tree/master/examples)
+#### run the example above with:
+
+```bash
+$ go run github.com/moleculer-go/store/examples/usersMongo start
+```
+
+> More MongoDB examples can be found on [GitHub](https://github.com/moleculer-go/store/tree/master/examples)
+
+## SQLite Adapter
+
+This adapter is based on [crawshaw/sqlite](https://github.com/crawshaw/sqlite).
+
+### Install
+
+```bash
+$ go get -u github.com/moleculer-go/store
+
+# Or with go modules
+github.com/moleculer-go/store v1.0.1
+```
+
+### Usage
+
+```go
+package main
+
+import (
+  "fmt"
+  "time"
+
+  "github.com/moleculer-go/store"
+  "github.com/moleculer-go/store/sqlite"
+  "github.com/spf13/cobra"
+
+  "github.com/moleculer-go/moleculer"
+  "github.com/moleculer-go/moleculer/broker"
+  "github.com/moleculer-go/moleculer/cli"
+)
+
+func main() {
+  cli.Start(
+    &moleculer.Config{LogLevel: "debug"},
+    func(broker *broker.ServiceBroker, cmd *cobra.Command) {
+      broker.Publish(moleculer.ServiceSchema{
+        Name: "users",
+        Settings: map[string]interface{}{
+          "fields":    []string{"id", "username", "name"},
+          "populates": map[string]interface{}{"friends": "users.get"},
+        },
+        Mixins: []moleculer.Mixin{store.Mixin(&sqlite.Adapter{
+          URI:   "file:memory:?mode=memory",
+          Table: "users",
+          Columns: []sqlite.Column{
+            {
+              Name: "username",
+              Type: "string",
+            },
+            {
+              Name: "name",
+              Type: "string",
+            },
+            {
+              Name: "status",
+              Type: "integer",
+            },
+          },
+        })},
+      })
+      broker.Start()
+      time.Sleep(time.Millisecond * 300)
+      user := <-broker.Call("users.create", map[string]interface{}{
+        "username": "john",
+        "name":     "John Doe",
+        "status":   1,
+      })
+
+      id := user.Get("id").String()
+      // Get all users
+      fmt.Printf("all users: ", <-broker.Call("users.find", map[string]interface{}{}))
+
+      // List users with pagination
+      fmt.Printf("list users: ", <-broker.Call("users.list", map[string]interface{}{
+        "page":     2,
+        "pageSize": 10,
+      }))
+
+      idParam := map[string]interface{}{"id": id}
+
+      // Get a user
+      fmt.Printf("get user: ", <-broker.Call("users.get", idParam))
+
+      // Update a user
+      fmt.Printf("update user: ", <-broker.Call("users.update", map[string]interface{}{
+        "id":   id,
+        "name": "Jane Doe",
+      }))
+
+      // Print user after update
+      fmt.Printf("get user: ", <-broker.Call("users.get", idParam))
+
+      // Delete a user
+      fmt.Printf("remove user: ", <-broker.Call("users.remove", idParam))
+
+      broker.Stop()
+
+    })
+}
+```
+
+#### run the example above with:
+
+```bash
+$ go run github.com/moleculer-go/store/examples/usersSQLite start
+```
+
+> More Database adaptor examples can be found on [GitHub](https://github.com/moleculer-go/store/tree/master/examples)
