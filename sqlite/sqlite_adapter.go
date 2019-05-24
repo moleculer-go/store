@@ -122,6 +122,7 @@ func (a *Adapter) Disconnect() error {
 	return nil
 }
 
+// columnsDefinition return the column definitions for CREATE TABLE
 func (a *Adapter) columnsDefinition() []string {
 	columns := []string{a.idField + " INTEGER PRIMARY KEY AUTOINCREMENT"}
 	for _, c := range a.Columns {
@@ -183,8 +184,9 @@ func (a *Adapter) updatePairs(param moleculer.Payload) ([]string, []interface{})
 	return columns, values
 }
 
-// extractFields will parse the payload and extract the column names,
-// and value placeholders -> $name and the list of fields.
+// insertFields will parse the payload and extract the column names with
+// value placeholders for the INSERT stmt.
+// It will also return the values.
 func (a *Adapter) insertFields(param moleculer.Payload) ([]string, []interface{}) {
 	columns := []string{}
 	values := []interface{}{}
@@ -504,6 +506,9 @@ func (a *Adapter) columnValue(column string, stmt *sqlite.Stmt) interface{} {
 
 var listSeparator = "||"
 
+// transformIn transform a value to be send to the database (IN)
+// receives the field name and the value.
+// return the values that should be inserted in the database.
 func (a *Adapter) transformIn(field string, value interface{}) interface{} {
 	if value == nil {
 		return nil
@@ -520,6 +525,13 @@ func (a *Adapter) transformIn(field string, value interface{}) interface{} {
 		}
 		return strings.Join(list, listSeparator)
 	}
+	if t == "[]byte" {
+		bytes, valid := value.([]byte)
+		if !valid {
+			return nil
+		}
+		return string(bytes)
+	}
 	if t == "[]int" {
 		list, valid := value.([]int)
 		if !valid {
@@ -534,7 +546,7 @@ func (a *Adapter) transformIn(field string, value interface{}) interface{} {
 	return value
 }
 
-// transformOut transfor column value on the way of the stmt
+// transformOut transform a values returned from the database (OUT)
 func (a *Adapter) transformOut(field string, value interface{}) interface{} {
 	if value == nil || value == "" {
 		return nil
@@ -552,6 +564,9 @@ func (a *Adapter) transformOut(field string, value interface{}) interface{} {
 	t := c.Type
 	if t == "[]string" {
 		return strings.Split(value.(string), listSeparator)
+	}
+	if t == "[]byte" {
+		return []byte(value.(string))
 	}
 	if t == "[]int" {
 		list := []int{}
@@ -585,6 +600,9 @@ func dbType(t string) string {
 		return "TEXT"
 	}
 	if t == "[]integer" {
+		return "TEXT"
+	}
+	if t == "[]byte" {
 		return "TEXT"
 	}
 	return strings.ToUpper(t)
