@@ -35,6 +35,10 @@ var _ = Describe("Sqlite Integration Test", func() {
 					Name: "status",
 					Type: "integer",
 				},
+				{
+					Name: "someBytes",
+					Type: "[]byte",
+				},
 			},
 		}
 		bkr = broker.New(&moleculer.Config{LogLevel: "error"})
@@ -88,7 +92,7 @@ var _ = Describe("Sqlite Integration Test", func() {
 		Expect(user.Get("name").String()).Should(Equal("John"))
 	})
 
-	XIt("should list all users", func() {
+	It("should list all users", func() {
 		<-bkr.Call("users.create", map[string]interface{}{
 			"username": "miko",
 			"name":     "Miko",
@@ -105,8 +109,9 @@ var _ = Describe("Sqlite Integration Test", func() {
 			"page":     1,
 			"pageSize": 2,
 		})
-		fmt.Println(users)
-		Expect(users.Get("rows").Len()).Should(Equal(4))
+		fmt.Println("")
+		fmt.Println("users.list rows: ", users.Get("rows"))
+		Expect(users.Get("rows").Len()).Should(Equal(2))
 		Expect(users.Get("rows").Array()[0].Get("name").String()).Should(Equal("Marie"))
 		Expect(users.Get("rows").Array()[1].Get("name").String()).Should(Equal("John"))
 
@@ -114,11 +119,32 @@ var _ = Describe("Sqlite Integration Test", func() {
 			"page":     2,
 			"pageSize": 2,
 		})
-		fmt.Println("rows: ", users.Get("rows"))
+		fmt.Println("")
+		fmt.Println("users.list rows: ", users.Get("rows"))
 		Expect(users.Get("rows").Len()).Should(Equal(2))
 		Expect(users.Get("rows").Array()[0].Get("name").String()).Should(Equal("Miko"))
 		Expect(users.Get("rows").Array()[1].Get("name").String()).Should(Equal("Gilbert"))
 
+	})
+
+	It("should store and retried array of bytes []byte", func() {
+		<-bkr.Call("users.create", map[string]interface{}{
+			"username":  "testBytes",
+			"name":      "bytes",
+			"someBytes": []byte("message stored as []byte"),
+		})
+
+		users := <-bkr.Call("users.find", map[string]interface{}{
+			"search":       "testBytes",
+			"searchFields": []string{"username"},
+			"fields":       []string{"someBytes", "name"},
+		})
+		Expect(users.Len()).Should(Equal(1))
+		testBytes := users.First()
+		Expect(testBytes.Get("name").String()).Should(Equal("bytes"))
+		Expect(testBytes.Get("someBytes").Exists()).Should(BeTrue())
+		bytes := testBytes.Get("someBytes").ByteArray()
+		Expect(string(bytes)).Should(Equal("message stored as []byte"))
 	})
 
 })
