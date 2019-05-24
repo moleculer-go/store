@@ -140,14 +140,6 @@ func removeAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) 
 func listAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		var rows moleculer.Payload
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			rows = adapter.Find(params)
-			wg.Done()
-		}()
-		total := adapter.Count(params)
-		wg.Wait()
 		pageSize := getInstance().Settings["pageSize"].(int)
 		if params.Get("pageSize").Exists() {
 			pageSize = params.Get("pageSize").Int()
@@ -157,6 +149,19 @@ func listAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) mo
 			page = params.Get("page").Int()
 		}
 
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			limit := page * pageSize
+			offset := (page - 1) * pageSize
+			rows = adapter.Find(params.AddMany(map[string]interface{}{
+				"limit":  limit,
+				"offset": offset,
+			}))
+			wg.Done()
+		}()
+		total := adapter.Count(params)
+		wg.Wait()
 		totalPages := math.Floor(
 			(total.Float() + float64(pageSize) - 1.0) / float64(pageSize))
 
