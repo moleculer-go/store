@@ -128,7 +128,7 @@ func (a *Adapter) columnsDefinition() []string {
 	for _, c := range a.Columns {
 		def := c.Name
 		if c.Type != "" {
-			def = def + " " + c.Type
+			def = def + " " + dbType(c.Type)
 		}
 		columns = append(columns, def)
 	}
@@ -604,6 +604,9 @@ func dbType(t string) string {
 	}
 	if t == "[]byte" {
 		return "TEXT"
+	}
+	if t == "float" {
+		return "REAL"
 	}
 	return strings.ToUpper(t)
 }
