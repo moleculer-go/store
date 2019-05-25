@@ -45,6 +45,7 @@ type Adapter interface {
 	Connect() error
 	Disconnect() error
 	Find(params moleculer.Payload) moleculer.Payload
+	FindAndUpdate(params moleculer.Payload) moleculer.Payload
 	FindOne(params moleculer.Payload) moleculer.Payload
 	FindById(params moleculer.Payload) moleculer.Payload
 	FindByIds(params moleculer.Payload) moleculer.Payload

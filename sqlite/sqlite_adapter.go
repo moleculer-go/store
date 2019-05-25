@@ -242,6 +242,43 @@ func (a *Adapter) loadSettings(settings map[string]interface{}) {
 	a.idField = idField
 }
 
+func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
+	conn := a.getConn()
+	if conn == nil {
+		return noConnectionError()
+	}
+	defer a.returnConn(conn)
+	return a.query(conn, a.findFields(param), param, a.rowToPayload)
+}
+
+func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
+	conn := a.getConn()
+	if conn == nil {
+		return noConnectionError()
+	}
+	defer a.returnConn(conn)
+	update := param.Get("update")
+	param = param.Remove("update")
+	originals := a.query(conn, a.findFields(param), param, a.rowToPayload)
+	if originals.IsError() {
+		return originals
+	}
+	result := []moleculer.Payload{}
+	for _, item := range originals.Array() {
+		id := item.Get(a.idField)
+		if err := a.updateById(conn, id, update); err != nil {
+			result = append(result, payload.New(err))
+		} else {
+			filter := payload.New(map[string]interface{}{
+				"query": map[string]interface{}{a.idField: id.Value()},
+			})
+			result = append(result,
+				a.query(conn, a.findFields(filter), filter, a.rowToPayload).First())
+		}
+	}
+	return payload.New(result)
+}
+
 func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
 	id := params.Get("id")
 	if !id.Exists() {
@@ -255,16 +292,23 @@ func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
 	if conn == nil {
 		return noConnectionError()
 	}
+	defer a.returnConn(conn)
+	if err := a.updateById(conn, id, update); err != nil {
+		return payload.New(err)
+	}
+	return a.FindById(id)
+}
+
+func (a *Adapter) updateById(conn *sqlite.Conn, id, update moleculer.Payload) error {
 	changes, values := a.updatePairs(update)
 	updtStmt := "UPDATE " + a.Table + " SET " + strings.Join(changes, ", ") + " WHERE id=" + id.String() + ";"
 	a.log.Debug(updtStmt)
 	if err := sqlitex.Exec(conn, updtStmt, nil, values...); err != nil {
 		a.log.Error("Error on update: ", err)
-		return payload.New(err)
+		return err
 	}
-	a.returnConn(conn)
 	a.log.Debug("update done.")
-	return a.FindById(id)
+	return nil
 }
 
 func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
@@ -445,23 +489,19 @@ func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) Count(param moleculer.Payload) moleculer.Payload {
-	return a.query([]string{"COUNT(*) as count"}, param, func(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
-		return payload.New(stmt.GetInt64("count"))
-	}).First()
-}
-func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
-	return a.query(a.findFields(param), param, a.rowToPayload)
-}
-
-type rowFactory func([]string, *sqlite.Stmt) moleculer.Payload
-
-func (a *Adapter) query(fields []string, param moleculer.Payload, mapRow rowFactory) moleculer.Payload {
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
 	}
 	defer a.returnConn(conn)
+	return a.query(conn, []string{"COUNT(*) as count"}, param, func(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
+		return payload.New(stmt.GetInt64("count"))
+	}).First()
+}
 
+type rowFactory func([]string, *sqlite.Stmt) moleculer.Payload
+
+func (a *Adapter) query(conn *sqlite.Conn, fields []string, param moleculer.Payload, mapRow rowFactory) moleculer.Payload {
 	limit, offset, sort := resolveFindOptions(param)
 
 	rows := []moleculer.Payload{}
