@@ -160,7 +160,7 @@ func noConnectionError() moleculer.Payload {
 	return payload.Error("No connection availble!. Did you call a.Connect() ?")
 }
 
-func (a *Adapter) catchConnError(msg string, conn *sqlite.Conn) {
+func (a *Adapter) catchConnError(msg string) {
 	if err := recover(); err != nil {
 		stackTrace := string(debug.Stack())
 		a.log.Error(msg, " - error: ", err, " stack track: ", stackTrace)
@@ -168,7 +168,7 @@ func (a *Adapter) catchConnError(msg string, conn *sqlite.Conn) {
 }
 
 func (a *Adapter) returnConn(conn *sqlite.Conn) {
-	defer a.catchConnError("Error trying to return connection to the pool", conn)
+	defer a.catchConnError("Error trying to return connection to the pool")
 	a.pool.Put(conn)
 }
 
@@ -269,6 +269,7 @@ func (a *Adapter) loadSettings(settings map[string]interface{}) {
 }
 
 func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
+	defer a.catchConnError("Error on find")
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
@@ -278,6 +279,7 @@ func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
+	defer a.catchConnError("Error on find and update")
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
@@ -285,6 +287,7 @@ func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
 	defer a.returnConn(conn)
 	update := param.Get("update")
 	param = param.Remove("update")
+
 	originals := a.query(conn, a.findFields(param), param, a.rowToPayload)
 	if originals.IsError() {
 		return originals
@@ -314,6 +317,7 @@ func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
+	defer a.catchConnError("Error on update by id")
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
@@ -322,7 +326,7 @@ func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
 	if err := a.updateById(conn, id, update); err != nil {
 		return payload.New(err)
 	}
-	return a.FindById(id)
+	return a.findById(conn, id)
 }
 
 func (a *Adapter) updateById(conn *sqlite.Conn, id, update moleculer.Payload) error {
@@ -338,6 +342,7 @@ func (a *Adapter) updateById(conn *sqlite.Conn, id, update moleculer.Payload) er
 }
 
 func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
+	defer a.catchConnError("Error on insert")
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
@@ -356,6 +361,7 @@ func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) RemoveAll() moleculer.Payload {
+	defer a.catchConnError("Error on remove all")
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
@@ -373,6 +379,7 @@ func (a *Adapter) RemoveAll() moleculer.Payload {
 }
 
 func (a *Adapter) RemoveById(id moleculer.Payload) moleculer.Payload {
+	defer a.catchConnError("Error on remove by id")
 	conn := a.getConn()
 	if conn == nil {
 		return noConnectionError()
@@ -492,22 +499,40 @@ func (a *Adapter) cleanFields(fields []string) []string {
 }
 
 func (a *Adapter) FindById(id moleculer.Payload) moleculer.Payload {
-	filter := payload.New(map[string]interface{}{
-		"query": map[string]interface{}{a.idField: id.Value()},
-	})
-	return a.FindOne(filter)
+	defer a.catchConnError("Error on find by id: " + id.String())
+	conn := a.getConn()
+	if conn == nil {
+		return noConnectionError()
+	}
+	defer a.returnConn(conn)
+	return a.findById(conn, id)
 }
 
-func (a *Adapter) FindByIds(params moleculer.Payload) moleculer.Payload {
-	if !params.IsArray() {
-		return payload.Error("FindByIds() only support lists!  --> !params.IsArray()")
+func (a *Adapter) findById(conn *sqlite.Conn, id moleculer.Payload) moleculer.Payload {
+	filter := payload.New(map[string]interface{}{
+		"query": map[string]interface{}{a.idField: id.Value()},
+		"limit": 1,
+	})
+	return a.query(conn, a.findFields(filter), filter, a.rowToPayload).First()
+}
+
+// FindByIds
+func (a *Adapter) FindByIds(ids moleculer.Payload) moleculer.Payload {
+	defer a.catchConnError("Error on find by ids: " + ids.String())
+	conn := a.getConn()
+	if conn == nil {
+		return noConnectionError()
 	}
-	r := payload.EmptyList()
-	params.ForEach(func(idx interface{}, id moleculer.Payload) bool {
-		r = r.AddItem(a.FindById(id))
+	defer a.returnConn(conn)
+	if !ids.IsArray() {
+		return payload.Error("FindByIds() only support lists!")
+	}
+	list := make([]moleculer.Payload, ids.Len())
+	ids.ForEach(func(idx interface{}, id moleculer.Payload) bool {
+		list[idx.(int)] = a.findById(conn, id)
 		return true
 	})
-	return r
+	return payload.New(list)
 }
 
 func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {

@@ -15,7 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == ""))
+var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == "true"))
 
 var logLevel = "error"
 
@@ -23,7 +23,7 @@ var mongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
 
 var _ = Describe("Moleculer DB Integration Tests", func() {
 
-	//cleanResult remove dyanmic fields from the payload.
+	//cleanResult remove dynamic fields from the payload.
 	cleanResult := func(p moleculer.Payload) moleculer.Payload {
 		return p.Remove("id", "_id", "master", "friends")
 	}
@@ -33,8 +33,8 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		Context(label, func() {
 			var johnSnow, maria, johnT moleculer.Payload
 			var bkr *broker.ServiceBroker
-
 			BeforeEach(func() {
+				//ready := make(chan bool, 1)
 				bkr = broker.New(&moleculer.Config{
 					DiscoverNodeID: func() string { return "node_populates" },
 					LogLevel:       logLevel,
@@ -49,10 +49,14 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 						},
 					},
 					Mixins: []moleculer.Mixin{store.Mixin(adapter)},
+					Started: func(c moleculer.BrokerContext, svc moleculer.ServiceSchema) {
+						johnSnow, maria, johnT = mocks.LoadUsers(adapter)
+						//ready <- true
+					},
 				}
 				bkr.Publish(userService)
 				bkr.Start()
-				johnSnow, maria, johnT = mocks.LoadUsers(adapter)
+				//<-ready
 			})
 
 			AfterEach(func() {
@@ -120,19 +124,21 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		Context(label, func() {
 			var johnSnow, marie, johnT moleculer.Payload
 			bkr := broker.New(&moleculer.Config{
-				DiscoverNodeID: func() string { return "node_find" },
+				DiscoverNodeID: func() string { return "node_" + label },
 				LogLevel:       logLevel,
 			})
 			adapter := createAdapter()
 			userService := moleculer.ServiceSchema{
 				Name:   "user",
 				Mixins: []moleculer.Mixin{store.Mixin(adapter)},
+				Started: func(c moleculer.BrokerContext, svc moleculer.ServiceSchema) {
+					johnSnow, marie, johnT = mocks.LoadUsers(adapter)
+				},
 			}
 
 			BeforeEach(func() {
 				bkr.Publish(userService)
 				bkr.Start()
-				johnSnow, marie, johnT = mocks.LoadUsers(adapter)
 				Expect(johnSnow.Error()).Should(BeNil())
 				Expect(marie.Error()).Should(BeNil())
 				Expect(johnT.Error()).Should(BeNil())
@@ -223,7 +229,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		},
 	}
 
-	testPopulates("Mongo-Adapter", func() store.Adapter {
+	testPopulates("SQLite-Adapter", func() store.Adapter {
 		return &sqlite.Adapter{
 			URI:     "file:memory:?mode=memory",
 			Table:   "users_populates",
@@ -231,12 +237,12 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		}
 	})
 
-	testActions("SQLite-Adapter", func() store.Adapter {
-		return &sqlite.Adapter{
-			URI:     "file:memory:?mode=memory",
-			Table:   "users_actions",
-			Columns: cols,
-		}
-	})
+	// testActions("SQLite-Adapter", func() store.Adapter {
+	// 	return &sqlite.Adapter{
+	// 		URI:     "file:memory:?mode=memory",
+	// 		Table:   "users_actions",
+	// 		Columns: cols,
+	// 	}
+	// })
 
 })

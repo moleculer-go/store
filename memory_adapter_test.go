@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == ""))
+var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == "true"))
 
 var _ = Describe("MemoryAdapter", func() {
 

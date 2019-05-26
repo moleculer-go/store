@@ -39,16 +39,12 @@ func (adapter *MongoAdapter) Connect() error {
 	if adapter.coll != nil {
 		return nil
 	}
-	//Getting weird "unlock of unlocked mutex" errors.. this was added here to avoid
-	// same adater being connected twice
-	// adapter.mutex.Lock()
-	// defer adapter.mutex.Unlock()
-
 	adapter.logger.Debug("MongoAdapter Connect() MongoURL: ", adapter.MongoURL)
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	var err error
 	adapter.client, err = mongo.Connect(ctx, options.Client().ApplyURI(adapter.MongoURL))
 	if err != nil {
+		adapter.logger.Error("MongoAdapter Connect() error on connect() - error: ", err)
 		return err
 	}
 	err = adapter.client.Ping(ctx, readpref.Primary())
@@ -214,6 +210,26 @@ func idTransform(bm bson.M) bson.M {
 		delete(bm, "_id")
 	}
 	return bm
+}
+
+func (adapter *MongoAdapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
+	update := param.Get("update")
+	param = param.Remove("update")
+
+	originals := adapter.Find(param)
+	if originals.IsError() {
+		return originals
+	}
+	result := []moleculer.Payload{}
+	for _, item := range originals.Array() {
+		id := item.Get("id")
+		if err := adapter.UpdateById(id, update); err != nil {
+			result = append(result, payload.New(err))
+		} else {
+			result = append(result, adapter.FindById(id))
+		}
+	}
+	return payload.New(result)
 }
 
 // Find search the data store with the params provided.
