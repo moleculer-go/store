@@ -3,6 +3,7 @@ package sqlite
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -34,7 +35,8 @@ type Adapter struct {
 	// from what is passed in the params
 	ColName func(string) string
 
-	pool *sqlitex.Pool
+	pool             *sqlitex.Pool
+	waitForPoolLimit time.Duration
 
 	connected bool
 	log       *log.Entry
@@ -59,6 +61,7 @@ func (a *Adapter) Init(log *log.Entry, settings map[string]interface{}) {
 	if a.PoolSize == 0 {
 		a.PoolSize = 1
 	}
+	a.waitForPoolLimit = time.Millisecond * 500
 	a.loadSettings(a.settings)
 }
 
@@ -157,13 +160,36 @@ func noConnectionError() moleculer.Payload {
 	return payload.Error("No connection availble!. Did you call a.Connect() ?")
 }
 
+func (a *Adapter) catchConnError(msg string, conn *sqlite.Conn) {
+	if err := recover(); err != nil {
+		stackTrace := string(debug.Stack())
+		a.log.Error(msg, " - error: ", err, " stack track: ", stackTrace)
+	}
+}
+
 func (a *Adapter) returnConn(conn *sqlite.Conn) {
+	defer a.catchConnError("Error trying to return connection to the pool", conn)
 	a.pool.Put(conn)
 }
 
+// getConn fetch a connection from the pool
+// if pool is not available and setting waitForPoolLimit is set
+// it will wait for that period for the pool to be available
 func (a *Adapter) getConn() *sqlite.Conn {
 	if a.pool == nil {
-		panic("Adapter not connected!")
+		if a.waitForPoolLimit == 0 {
+			panic("Adapter not connected!")
+		}
+		start := time.Now()
+		for {
+			if a.pool != nil {
+				break
+			}
+			if time.Since(start) >= a.waitForPoolLimit {
+				return nil
+			}
+			time.Sleep(time.Microsecond)
+		}
 	}
 	return a.pool.Get(nil)
 }
@@ -668,7 +694,7 @@ func (a *Adapter) wrapValue(cType string, value moleculer.Payload) (r string) {
 		return "'" + strconv.FormatFloat(value.Float(), 'f', 6, 64) + "'"
 	}
 	if cType == "INTEGER" {
-		return "'" + strconv.FormatInt(value.Int64(), 64) + "'"
+		return fmt.Sprint(value.Int64())
 	}
 
 	return r
