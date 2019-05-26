@@ -85,6 +85,13 @@ func findAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) mo
 	}
 }
 
+// findAndUpdateAction
+func findAndUpdateAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
+	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
+		return transformResult(ctx, params, adapter.FindAndUpdate(params), getInstance)
+	}
+}
+
 //createAction
 func createAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
@@ -336,6 +343,25 @@ func Mixin(adapter Adapter) moleculer.Mixin {
 					}{},
 				},
 				Handler: removeAction(adapter, getInstance),
+			},
+			//findAndUpdate Action
+			{
+				Name: "findAndUpdate",
+				Settings: map[string]interface{}{
+					"cache": false,
+				},
+				Schema: moleculer.ObjectSchema{
+					struct {
+						populate []string               `optional:"true"`
+						fields   []string               `optional:"true"`
+						limit    int                    `optional:"true" min:"0"`
+						offset   int                    `optional:"true" min:"0"`
+						sort     string                 `optional:"true"`
+						update   map[string]interface{} `optional:"false"`
+						query    map[string]interface{} `optional:"false"`
+					}{},
+				},
+				Handler: findAndUpdateAction(adapter, getInstance),
 			},
 		},
 	}

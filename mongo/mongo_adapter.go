@@ -118,6 +118,20 @@ func parseFindOptions(params moleculer.Payload) *options.FindOptions {
 	return &opts
 }
 
+func parseFindOneAndUpdateOptions(params moleculer.Payload) *options.FindOneAndUpdateOptions {
+	opts := options.FindOneAndUpdateOptions{}
+	sort := params.Get("sort")
+	if sort.Exists() {
+		if sort.IsArray() {
+			opts.Sort = sortsFromStringArray(sort)
+		} else {
+			opts.Sort = sortsFromString(sort)
+		}
+
+	}
+	return &opts
+}
+
 func sortEntry(entry string) primitive.E {
 	item := primitive.E{entry, 1}
 	if strings.Index(entry, "-") == 0 {
@@ -216,20 +230,24 @@ func (adapter *MongoAdapter) FindAndUpdate(param moleculer.Payload) moleculer.Pa
 	update := param.Get("update")
 	param = param.Remove("update")
 
-	originals := adapter.Find(param)
-	if originals.IsError() {
-		return originals
+	adapter.checkConnected()
+	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
+	filter := parseFilter(param)
+	opts := parseFindOneAndUpdateOptions(param)
+
+	updateValues := payload.Empty().Add("$set", update).Bson()
+	r := adapter.coll.FindOneAndUpdate(ctx, filter, updateValues, opts)
+	var item bson.M
+	err := r.Decode(&item)
+	if err != nil {
+		return payload.New(err)
 	}
-	result := []moleculer.Payload{}
-	for _, item := range originals.Array() {
-		id := item.Get("id")
-		if err := adapter.UpdateById(id, update); err != nil {
-			result = append(result, payload.New(err))
-		} else {
-			result = append(result, adapter.FindById(id))
-		}
+	transformed := applyTransforms(item, idTransform)
+
+	if err := r.Err(); err != nil {
+		return payload.New(err)
 	}
-	return payload.New(result)
+	return payload.New(transformed)
 }
 
 // Find search the data store with the params provided.
