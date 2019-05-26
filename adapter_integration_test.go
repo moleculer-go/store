@@ -237,12 +237,12 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		}
 	})
 
-	// testActions("SQLite-Adapter", func() store.Adapter {
-	// 	return &sqlite.Adapter{
-	// 		URI:     "file:memory:?mode=memory",
-	// 		Table:   "users_actions",
-	// 		Columns: cols,
-	// 	}
-	// })
+	testActions("SQLite-Adapter", func() store.Adapter {
+		return &sqlite.Adapter{
+			URI:     "file:memory:?mode=memory",
+			Table:   "users_actions",
+			Columns: cols,
+		}
+	})
 
 })
