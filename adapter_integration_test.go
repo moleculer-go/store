@@ -177,7 +177,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 				Expect(snap.SnapshotMulti(label+"-updated-find", cleanResult(fr))).Should(Succeed())
 			})
 
-			It("find and update a record ", func() {
+			It("find and update a record", func() {
 				rs := <-bkr.Call("user.findAndUpdate", map[string]interface{}{
 					"query": map[string]interface{}{
 						"name":     johnSnow.Get("name").String(),
