@@ -3,6 +3,7 @@ package sqlite
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -34,7 +35,8 @@ type Adapter struct {
 	// from what is passed in the params
 	ColName func(string) string
 
-	pool *sqlitex.Pool
+	pool             *sqlitex.Pool
+	waitForPoolLimit time.Duration
 
 	connected bool
 	log       *log.Entry
@@ -59,6 +61,7 @@ func (a *Adapter) Init(log *log.Entry, settings map[string]interface{}) {
 	if a.PoolSize == 0 {
 		a.PoolSize = 1
 	}
+	a.waitForPoolLimit = time.Millisecond * 500
 	a.loadSettings(a.settings)
 }
 
@@ -122,48 +125,40 @@ func (a *Adapter) Disconnect() error {
 	return nil
 }
 
-// columnsDefinition return the column definitions for CREATE TABLE
-func (a *Adapter) columnsDefinition() []string {
-	columns := []string{a.idField + " INTEGER PRIMARY KEY AUTOINCREMENT"}
-	for _, c := range a.Columns {
-		def := c.Name
-		if c.Type != "" {
-			def = def + " " + dbType(c.Type)
-		}
-		columns = append(columns, def)
-	}
-	return columns
-}
-
-func (a *Adapter) createTable() error {
-	conn := a.getConn()
-	if conn == nil {
-		return noConnectionError().Error()
-	}
-	defer a.returnConn(conn)
-
-	create := "CREATE TABLE " + a.Table + " (" + strings.Join(a.columnsDefinition(), ", ") + ");"
-	a.log.Debug(create)
-
-	err := sqlitex.ExecTransient(conn, create, nil)
-	if err != nil {
-		return err
-	}
-	a.log.Debug("table " + a.Table + " created !!!")
-	return nil
-}
-
 func noConnectionError() moleculer.Payload {
 	return payload.Error("No connection availble!. Did you call a.Connect() ?")
+}
+
+func (a *Adapter) catchConnError(msg string, resChan chan moleculer.Payload) {
+	if err := recover(); err != nil {
+		stackTrace := string(debug.Stack())
+		a.log.Error("SQLite adapter Error - message: ", msg, " - error: ", err, " stack track: ", stackTrace)
+		resChan <- payload.New(err)
+	}
 }
 
 func (a *Adapter) returnConn(conn *sqlite.Conn) {
 	a.pool.Put(conn)
 }
 
+// getConn fetch a connection from the pool
+// if pool is not available and setting waitForPoolLimit is set
+// it will wait for that period for the pool to be available
 func (a *Adapter) getConn() *sqlite.Conn {
 	if a.pool == nil {
-		panic("Adapter not connected!")
+		if a.waitForPoolLimit == 0 {
+			panic("Adapter not connected!")
+		}
+		start := time.Now()
+		for {
+			if a.pool != nil {
+				break
+			}
+			if time.Since(start) >= a.waitForPoolLimit {
+				return nil
+			}
+			time.Sleep(time.Microsecond)
+		}
 	}
 	return a.pool.Get(nil)
 }
@@ -242,6 +237,97 @@ func (a *Adapter) loadSettings(settings map[string]interface{}) {
 	a.idField = idField
 }
 
+// columnsDefinition return the column definitions for CREATE TABLE
+func (a *Adapter) columnsDefinition() []string {
+	columns := []string{a.idField + " INTEGER PRIMARY KEY AUTOINCREMENT"}
+	for _, c := range a.Columns {
+		def := c.Name
+		if c.Type != "" {
+			def = def + " " + dbType(c.Type)
+		}
+		columns = append(columns, def)
+	}
+	return columns
+}
+
+func (a *Adapter) createTable() error {
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on create table", resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+		}
+		defer a.returnConn(conn)
+
+		create := "CREATE TABLE " + a.Table + " (" + strings.Join(a.columnsDefinition(), ", ") + ");"
+		a.log.Debug(create)
+
+		err := sqlitex.ExecTransient(conn, create, nil)
+		if err != nil {
+			resChan <- payload.New(err)
+		}
+		a.log.Debug("table " + a.Table + " created !!!")
+		resChan <- payload.Empty()
+	}()
+	p := <-resChan
+	if p.IsError() {
+		return p.Error()
+	}
+	return nil
+}
+
+func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on find", resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
+		resChan <- a.query(conn, a.findFields(param), param, a.rowToPayload)
+	}()
+	return <-resChan
+}
+
+func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on find and update", resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
+		update := param.Get("update")
+		param = param.Remove("update")
+
+		originals := a.query(conn, a.findFields(param), param, a.rowToPayload)
+		if originals.IsError() {
+			resChan <- originals
+			return
+		}
+		result := []moleculer.Payload{}
+		for _, item := range originals.Array() {
+			id := item.Get(a.idField)
+			if err := a.updateById(conn, id, update); err != nil {
+				result = append(result, payload.New(err))
+			} else {
+				filter := payload.New(map[string]interface{}{
+					"query": map[string]interface{}{a.idField: id.Value()},
+				})
+				updated := a.query(conn, a.findFields(filter), filter, a.rowToPayload).First()
+				result = append(result, updated)
+			}
+		}
+		resChan <- payload.New(result)
+	}()
+	return <-resChan
+}
+
 func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
 	id := params.Get("id")
 	if !id.Exists() {
@@ -251,72 +337,176 @@ func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
-	conn := a.getConn()
-	if conn == nil {
-		return noConnectionError()
-	}
-	changes, values := a.updatePairs(update)
-	updtStmt := "UPDATE " + a.Table + " SET " + strings.Join(changes, ", ") + " WHERE id=" + id.String() + ";"
-	a.log.Debug(updtStmt)
-	if err := sqlitex.Exec(conn, updtStmt, nil, values...); err != nil {
-		a.log.Error("Error on update: ", err)
-		return payload.New(err)
-	}
-	a.returnConn(conn)
-	a.log.Debug("update done.")
-	return a.FindById(id)
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on update by id: "+id.String(), resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
+		if err := a.updateById(conn, id, update); err != nil {
+			resChan <- payload.New(err)
+			return
+		}
+		resChan <- a.findById(conn, id)
+	}()
+	return <-resChan
 }
 
 func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
-	conn := a.getConn()
-	if conn == nil {
-		return noConnectionError()
-	}
-	defer a.returnConn(conn)
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on insert", resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
 
-	columns, values := a.insertFields(param)
-	insert := "INSERT INTO " + a.Table + " (" + strings.Join(columns, ", ") + ") VALUES(" + strings.Join(placeholders(columns), ", ") + ") ;"
-	a.log.Debug(insert)
-	a.log.Debug("values: ", values)
-	if err := sqlitex.Exec(conn, insert, nil, values...); err != nil {
-		a.log.Error("Error on insert: ", err, " - values: ", values)
-		return payload.New(err)
-	}
-	return param.Add(a.idField, conn.LastInsertRowID())
+		columns, values := a.insertFields(param)
+		insert := "INSERT INTO " + a.Table + " (" + strings.Join(columns, ", ") + ") VALUES(" + strings.Join(placeholders(columns), ", ") + ") ;"
+		a.log.Debug(insert)
+		a.log.Debug("values: ", values)
+		if err := sqlitex.Exec(conn, insert, nil, values...); err != nil {
+			a.log.Error("Error on insert: ", err, " - values: ", values)
+			resChan <- payload.New(err)
+			return
+		}
+		resChan <- param.Add(a.idField, conn.LastInsertRowID())
+	}()
+	return <-resChan
 }
 
 func (a *Adapter) RemoveAll() moleculer.Payload {
-	conn := a.getConn()
-	if conn == nil {
-		return noConnectionError()
-	}
-	defer a.returnConn(conn)
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on remove all", resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
 
-	delete := "DELETE FROM " + a.Table + " ;"
-	a.log.Debug(delete)
-	if err := sqlitex.Exec(conn, delete, nil); err != nil {
-		a.log.Error("Error on delete: ", err)
-		return payload.New(err)
-	}
-	deletedCount := conn.Changes()
-	return payload.New(map[string]int{"deletedCount": deletedCount})
+		delete := "DELETE FROM " + a.Table + " ;"
+		a.log.Debug(delete)
+		if err := sqlitex.Exec(conn, delete, nil); err != nil {
+			a.log.Error("Error on delete: ", err)
+			resChan <- payload.New(err)
+			return
+		}
+		deletedCount := conn.Changes()
+		resChan <- payload.New(map[string]int{"deletedCount": deletedCount})
+	}()
+	return <-resChan
 }
 
 func (a *Adapter) RemoveById(id moleculer.Payload) moleculer.Payload {
-	conn := a.getConn()
-	if conn == nil {
-		return noConnectionError()
-	}
-	defer a.returnConn(conn)
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on remove by id: "+id.String(), resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
 
-	delete := "DELETE FROM " + a.Table + " WHERE id = " + id.String() + " ;"
-	a.log.Debug(delete)
-	if err := sqlitex.Exec(conn, delete, nil); err != nil {
-		a.log.Error("Error on delete: ", err)
-		return payload.New(err)
+		delete := "DELETE FROM " + a.Table + " WHERE id = " + id.String() + " ;"
+		a.log.Debug(delete)
+		if err := sqlitex.Exec(conn, delete, nil); err != nil {
+			a.log.Error("Error on delete: ", err)
+			resChan <- payload.New(err)
+			return
+		}
+		deletedCount := conn.Changes()
+		resChan <- payload.New(map[string]int{"deletedCount": deletedCount})
+	}()
+	return <-resChan
+}
+
+func (a *Adapter) FindById(id moleculer.Payload) moleculer.Payload {
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on find by id: "+id.String(), resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
+		resChan <- a.findById(conn, id)
+	}()
+	return <-resChan
+}
+
+// FindByIds
+func (a *Adapter) FindByIds(ids moleculer.Payload) moleculer.Payload {
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on find by ids: "+ids.String(), resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
+		if !ids.IsArray() {
+			resChan <- payload.Error("FindByIds() only support lists!")
+			return
+		}
+		list := make([]moleculer.Payload, ids.Len())
+		ids.ForEach(func(idx interface{}, id moleculer.Payload) bool {
+			list[idx.(int)] = a.findById(conn, id)
+			return true
+		})
+		resChan <- payload.New(list)
+	}()
+	return <-resChan
+}
+
+func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {
+	return a.Find(params.Add("limit", 1)).First()
+}
+
+func (a *Adapter) Count(param moleculer.Payload) moleculer.Payload {
+	resChan := make(chan moleculer.Payload, 1)
+	go func() {
+		defer a.catchConnError("Error on count ", resChan)
+		conn := a.getConn()
+		if conn == nil {
+			resChan <- noConnectionError()
+			return
+		}
+		defer a.returnConn(conn)
+		resChan <- a.query(conn, []string{"COUNT(*) as count"}, param, func(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
+			return payload.New(stmt.GetInt64("count"))
+		}).First()
+	}()
+	return <-resChan
+}
+
+func (a *Adapter) updateById(conn *sqlite.Conn, id, update moleculer.Payload) error {
+	changes, values := a.updatePairs(update)
+	updtStmt := "UPDATE " + a.Table + " SET " + strings.Join(changes, ", ") + " WHERE id=" + id.String() + ";"
+	a.log.Debug(updtStmt, " - values: ", values)
+	if err := sqlitex.Exec(conn, updtStmt, nil, values...); err != nil {
+		a.log.Error("Error on update: ", err)
+		return err
 	}
-	deletedCount := conn.Changes()
-	return payload.New(map[string]int{"deletedCount": deletedCount})
+	a.log.Debug("update done.")
+	return nil
+}
+
+func (a *Adapter) findById(conn *sqlite.Conn, id moleculer.Payload) moleculer.Payload {
+	filter := payload.New(map[string]interface{}{
+		"query": map[string]interface{}{a.idField: id.Value()},
+		"limit": 1,
+	})
+	return a.query(conn, a.findFields(filter), filter, a.rowToPayload).First()
 }
 
 func resolveFindOptions(param moleculer.Payload) (limit, offset string, sort []string) {
@@ -421,47 +611,9 @@ func (a *Adapter) cleanFields(fields []string) []string {
 	return list
 }
 
-func (a *Adapter) FindById(id moleculer.Payload) moleculer.Payload {
-	filter := payload.New(map[string]interface{}{
-		"query": map[string]interface{}{a.idField: id.Value()},
-	})
-	return a.FindOne(filter)
-}
-
-func (a *Adapter) FindByIds(params moleculer.Payload) moleculer.Payload {
-	if !params.IsArray() {
-		return payload.Error("FindByIds() only support lists!  --> !params.IsArray()")
-	}
-	r := payload.EmptyList()
-	params.ForEach(func(idx interface{}, id moleculer.Payload) bool {
-		r = r.AddItem(a.FindById(id))
-		return true
-	})
-	return r
-}
-
-func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {
-	return a.Find(params.Add("limit", 1)).First()
-}
-
-func (a *Adapter) Count(param moleculer.Payload) moleculer.Payload {
-	return a.query([]string{"COUNT(*) as count"}, param, func(fields []string, stmt *sqlite.Stmt) moleculer.Payload {
-		return payload.New(stmt.GetInt64("count"))
-	}).First()
-}
-func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
-	return a.query(a.findFields(param), param, a.rowToPayload)
-}
-
 type rowFactory func([]string, *sqlite.Stmt) moleculer.Payload
 
-func (a *Adapter) query(fields []string, param moleculer.Payload, mapRow rowFactory) moleculer.Payload {
-	conn := a.getConn()
-	if conn == nil {
-		return noConnectionError()
-	}
-	defer a.returnConn(conn)
-
+func (a *Adapter) query(conn *sqlite.Conn, fields []string, param moleculer.Payload, mapRow rowFactory) moleculer.Payload {
 	limit, offset, sort := resolveFindOptions(param)
 
 	rows := []moleculer.Payload{}
@@ -628,7 +780,7 @@ func (a *Adapter) wrapValue(cType string, value moleculer.Payload) (r string) {
 		return "'" + strconv.FormatFloat(value.Float(), 'f', 6, 64) + "'"
 	}
 	if cType == "INTEGER" {
-		return "'" + strconv.FormatInt(value.Int64(), 64) + "'"
+		return fmt.Sprint(value.Int64())
 	}
 
 	return r

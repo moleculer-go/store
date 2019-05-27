@@ -15,7 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == ""))
+var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == "true"))
 
 var logLevel = "error"
 
@@ -23,7 +23,7 @@ var mongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
 
 var _ = Describe("Moleculer DB Integration Tests", func() {
 
-	//cleanResult remove dyanmic fields from the payload.
+	//cleanResult remove dynamic fields from the payload.
 	cleanResult := func(p moleculer.Payload) moleculer.Payload {
 		return p.Remove("id", "_id", "master", "friends")
 	}
@@ -33,8 +33,8 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		Context(label, func() {
 			var johnSnow, maria, johnT moleculer.Payload
 			var bkr *broker.ServiceBroker
-
 			BeforeEach(func() {
+				//ready := make(chan bool, 1)
 				bkr = broker.New(&moleculer.Config{
 					DiscoverNodeID: func() string { return "node_populates" },
 					LogLevel:       logLevel,
@@ -49,10 +49,14 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 						},
 					},
 					Mixins: []moleculer.Mixin{store.Mixin(adapter)},
+					Started: func(c moleculer.BrokerContext, svc moleculer.ServiceSchema) {
+						johnSnow, maria, johnT = mocks.LoadUsers(adapter)
+						//ready <- true
+					},
 				}
 				bkr.Publish(userService)
 				bkr.Start()
-				johnSnow, maria, johnT = mocks.LoadUsers(adapter)
+				//<-ready
 			})
 
 			AfterEach(func() {
@@ -120,19 +124,21 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		Context(label, func() {
 			var johnSnow, marie, johnT moleculer.Payload
 			bkr := broker.New(&moleculer.Config{
-				DiscoverNodeID: func() string { return "node_find" },
+				DiscoverNodeID: func() string { return "node_" + label },
 				LogLevel:       logLevel,
 			})
 			adapter := createAdapter()
 			userService := moleculer.ServiceSchema{
 				Name:   "user",
 				Mixins: []moleculer.Mixin{store.Mixin(adapter)},
+				Started: func(c moleculer.BrokerContext, svc moleculer.ServiceSchema) {
+					johnSnow, marie, johnT = mocks.LoadUsers(adapter)
+				},
 			}
 
 			BeforeEach(func() {
 				bkr.Publish(userService)
 				bkr.Start()
-				johnSnow, marie, johnT = mocks.LoadUsers(adapter)
 				Expect(johnSnow.Error()).Should(BeNil())
 				Expect(marie.Error()).Should(BeNil())
 				Expect(johnT.Error()).Should(BeNil())
@@ -142,20 +148,20 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 				bkr.Stop()
 			})
 
-			It("find records and match with snapshot", func() {
+			It("find records", func() {
 				rs := <-bkr.Call("user.find", map[string]interface{}{})
 				Expect(rs.Error()).Should(BeNil())
 				Expect(snap.SnapshotMulti(label+"-find-result", cleanResult(rs))).Should(Succeed())
 			})
 
-			It("list records and match with snapshot", func() {
+			It("list records", func() {
 				rs := <-bkr.Call("user.list", map[string]interface{}{})
 				Expect(rs.Error()).Should(BeNil())
 				Expect(snap.SnapshotMulti(label+"-list-atts", cleanResult(rs.Remove("rows")))).Should(Succeed())
 				Expect(snap.SnapshotMulti(label+"-list-rows", cleanResult(rs.Get("rows").Remove("id")))).Should(Succeed())
 			})
 
-			It("create a record and match with snapshot", func() {
+			It("create a record", func() {
 				rs := <-bkr.Call("user.create", map[string]interface{}{"name": "Ze", "lastname": "DoCaixao"})
 				Expect(rs.Error()).Should(BeNil())
 				Expect(snap.SnapshotMulti(label+"-created-record", cleanResult(rs))).Should(Succeed())
@@ -163,7 +169,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 				Expect(snap.SnapshotMulti(label+"-created-find", cleanResult(fr))).Should(Succeed())
 			})
 
-			It("update a record and match with snapshot", func() {
+			It("update a record", func() {
 				rs := <-bkr.Call("user.update", map[string]interface{}{"id": johnSnow.Get("id").String(), "name": "Ze", "lastname": "DasCouves"})
 				Expect(rs.Error()).Should(BeNil())
 				Expect(snap.SnapshotMulti(label+"-updated-record", cleanResult(rs))).Should(Succeed())
@@ -171,7 +177,22 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 				Expect(snap.SnapshotMulti(label+"-updated-find", cleanResult(fr))).Should(Succeed())
 			})
 
-			It("remove a record and match with snapshot", func() {
+			It("find and update a record", func() {
+				rs := <-bkr.Call("user.findAndUpdate", map[string]interface{}{
+					"query": map[string]interface{}{
+						"name":     johnSnow.Get("name").String(),
+						"lastname": johnSnow.Get("lastname").String(),
+					},
+					"update": map[string]interface{}{"name": "ZeDaSilva"},
+				})
+				Expect(rs.Error()).Should(BeNil())
+				Expect(snap.SnapshotMulti(label+"-find_and_updated-record", cleanResult(rs))).Should(Succeed())
+				fr := <-bkr.Call("user.get", map[string]interface{}{"id": johnSnow.Get("id").String()})
+				Expect(fr.Get("name").String()).Should(Equal("ZeDaSilva"))
+				Expect(snap.SnapshotMulti(label+"-find_and_updated-get", cleanResult(fr))).Should(Succeed())
+			})
+
+			It("remove a record", func() {
 				rs := <-bkr.Call("user.remove", map[string]interface{}{"id": johnT.Get("id").String()})
 				Expect(rs.Error()).Should(BeNil())
 				Expect(snap.SnapshotMulti(label+"-removed-record", cleanResult(rs))).Should(Succeed())
@@ -223,7 +244,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 		},
 	}
 
-	testPopulates("Mongo-Adapter", func() store.Adapter {
+	testPopulates("SQLite-Adapter", func() store.Adapter {
 		return &sqlite.Adapter{
 			URI:     "file:memory:?mode=memory",
 			Table:   "users_populates",

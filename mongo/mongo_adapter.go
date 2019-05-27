@@ -39,16 +39,12 @@ func (adapter *MongoAdapter) Connect() error {
 	if adapter.coll != nil {
 		return nil
 	}
-	//Getting weird "unlock of unlocked mutex" errors.. this was added here to avoid
-	// same adater being connected twice
-	// adapter.mutex.Lock()
-	// defer adapter.mutex.Unlock()
-
 	adapter.logger.Debug("MongoAdapter Connect() MongoURL: ", adapter.MongoURL)
 	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
 	var err error
 	adapter.client, err = mongo.Connect(ctx, options.Client().ApplyURI(adapter.MongoURL))
 	if err != nil {
+		adapter.logger.Error("MongoAdapter Connect() error on connect() - error: ", err)
 		return err
 	}
 	err = adapter.client.Ping(ctx, readpref.Primary())
@@ -111,6 +107,20 @@ func parseFindOptions(params moleculer.Payload) *options.FindOptions {
 		v := offset.Int64()
 		opts.Skip = &v
 	}
+	if sort.Exists() {
+		if sort.IsArray() {
+			opts.Sort = sortsFromStringArray(sort)
+		} else {
+			opts.Sort = sortsFromString(sort)
+		}
+
+	}
+	return &opts
+}
+
+func parseFindOneAndUpdateOptions(params moleculer.Payload) *options.FindOneAndUpdateOptions {
+	opts := options.FindOneAndUpdateOptions{}
+	sort := params.Get("sort")
 	if sort.Exists() {
 		if sort.IsArray() {
 			opts.Sort = sortsFromStringArray(sort)
@@ -214,6 +224,30 @@ func idTransform(bm bson.M) bson.M {
 		delete(bm, "_id")
 	}
 	return bm
+}
+
+func (adapter *MongoAdapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
+	update := param.Get("update")
+	param = param.Remove("update")
+
+	adapter.checkConnected()
+	ctx, _ := context.WithTimeout(context.Background(), adapter.Timeout)
+	filter := parseFilter(param)
+	opts := parseFindOneAndUpdateOptions(param)
+
+	updateValues := payload.Empty().Add("$set", update).Bson()
+	r := adapter.coll.FindOneAndUpdate(ctx, filter, updateValues, opts)
+	var item bson.M
+	err := r.Decode(&item)
+	if err != nil {
+		return payload.New(err)
+	}
+	transformed := applyTransforms(item, idTransform)
+
+	if err := r.Err(); err != nil {
+		return payload.New(err)
+	}
+	return payload.New(transformed)
 }
 
 // Find search the data store with the params provided.

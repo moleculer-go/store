@@ -72,6 +72,26 @@ func (adapter *MemoryAdapter) Disconnect() error {
 	return nil
 }
 
+func (adapter *MemoryAdapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
+	update := param.Get("update")
+	param = param.Remove("update")
+
+	originals := adapter.Find(param)
+	if originals.IsError() {
+		return originals
+	}
+	result := []moleculer.Payload{}
+	for _, item := range originals.Array() {
+		id := item.Get("id")
+		if err := adapter.UpdateById(id, update); err != nil {
+			result = append(result, payload.New(err))
+		} else {
+			result = append(result, adapter.FindById(id))
+		}
+	}
+	return payload.New(result)
+}
+
 func (adapter *MemoryAdapter) Find(params moleculer.Payload) moleculer.Payload {
 	searchFields := []string{"all"}
 	search := "*"

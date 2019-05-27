@@ -45,6 +45,7 @@ type Adapter interface {
 	Connect() error
 	Disconnect() error
 	Find(params moleculer.Payload) moleculer.Payload
+	FindAndUpdate(params moleculer.Payload) moleculer.Payload
 	FindOne(params moleculer.Payload) moleculer.Payload
 	FindById(params moleculer.Payload) moleculer.Payload
 	FindByIds(params moleculer.Payload) moleculer.Payload
@@ -81,6 +82,13 @@ func transformResult(ctx moleculer.Context, params, result moleculer.Payload, ge
 func findAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
 	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
 		return transformResult(ctx, params, adapter.Find(params), getInstance)
+	}
+}
+
+// findAndUpdateAction
+func findAndUpdateAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) moleculer.ActionHandler {
+	return func(ctx moleculer.Context, params moleculer.Payload) interface{} {
+		return transformResult(ctx, params, adapter.FindAndUpdate(params), getInstance)
 	}
 }
 
@@ -217,9 +225,10 @@ func Mixin(adapter Adapter) moleculer.Mixin {
 				}
 			}
 			if adapter != nil {
-				context.Logger().Info("db adapter started - service: ", svc.Name, " -> adapter.Connect()")
+				context.Logger().Info("db-mixin started - service: ", svc.Name, " -> connecting")
 				adapter.Init(context.Logger().WithField("store", "adapter"), svc.Settings)
 				adapter.Connect()
+				context.Logger().Info("db-mixin started - service: ", svc.Name, " -> connected!")
 			}
 		},
 		Stopped: func(context moleculer.BrokerContext, svc moleculer.ServiceSchema) {
@@ -334,6 +343,25 @@ func Mixin(adapter Adapter) moleculer.Mixin {
 					}{},
 				},
 				Handler: removeAction(adapter, getInstance),
+			},
+			//findAndUpdate Action
+			{
+				Name: "findAndUpdate",
+				Settings: map[string]interface{}{
+					"cache": false,
+				},
+				Schema: moleculer.ObjectSchema{
+					struct {
+						populate []string               `optional:"true"`
+						fields   []string               `optional:"true"`
+						limit    int                    `optional:"true" min:"0"`
+						offset   int                    `optional:"true" min:"0"`
+						sort     string                 `optional:"true"`
+						update   map[string]interface{} `optional:"false"`
+						query    map[string]interface{} `optional:"false"`
+					}{},
+				},
+				Handler: findAndUpdateAction(adapter, getInstance),
 			},
 		},
 	}
