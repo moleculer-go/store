@@ -35,8 +35,10 @@ type Adapter struct {
 	// from what is passed in the params
 	ColName func(string) string
 
-	pool             *sqlitex.Pool
-	waitForPoolLimit time.Duration
+	pool                 *sqlitex.Pool
+	waitForPoolLimit     time.Duration
+	connInUse            int
+	waitConnectionsLimit time.Duration
 
 	connected bool
 	log       *log.Entry
@@ -62,6 +64,7 @@ func (a *Adapter) Init(log *log.Entry, settings map[string]interface{}) {
 		a.PoolSize = 1
 	}
 	a.waitForPoolLimit = time.Millisecond * 500
+	a.waitConnectionsLimit = time.Second * 2
 	a.loadSettings(a.settings)
 }
 
@@ -111,11 +114,36 @@ func (a *Adapter) Connect() error {
 	return nil
 }
 
+// waitConnections wait for all connections to be returned to the pool
+func (a *Adapter) waitConnections() error {
+	start := time.Now()
+	for {
+		if a.connInUse == 0 {
+			return nil
+		}
+		if a.waitConnectionsLimit != 0 && time.Since(start) >= a.waitConnectionsLimit {
+			return errors.New("waitConnections() timeout! There are still " + strconv.Itoa(a.connInUse) + " connections in use.")
+		}
+		time.Sleep(time.Microsecond)
+	}
+}
+
 func (a *Adapter) Disconnect() error {
 	if !a.connected {
 		return nil
 	}
-	err := a.pool.Close()
+	a.log.Info("SQLite adapter - waiting for connections...")
+	err := a.waitConnections()
+	if err != nil {
+		a.log.Error("Could not disconnect SQLite - error: ", err)
+		defer func() {
+			a.waitConnections()
+			a.pool.Close()
+		}()
+		return errors.New(fmt.Sprint("Could not disconnect SQLite - error: ", err))
+	}
+	a.log.Info("SQLite adapter - all connections were returned :) - closing pool now.")
+	err = a.pool.Close()
 	if err != nil {
 		a.log.Error("Could not disconnect SQLite - error: ", err)
 		return errors.New(fmt.Sprint("Could not disconnect SQLite - error: ", err))
@@ -139,6 +167,7 @@ func (a *Adapter) catchConnError(msg string, resChan chan moleculer.Payload) {
 
 func (a *Adapter) returnConn(conn *sqlite.Conn) {
 	a.pool.Put(conn)
+	a.connInUse = a.connInUse - 1
 }
 
 // getConn fetch a connection from the pool
@@ -160,6 +189,7 @@ func (a *Adapter) getConn() *sqlite.Conn {
 			time.Sleep(time.Microsecond)
 		}
 	}
+	a.connInUse = a.connInUse + 1
 	return a.pool.Get(nil)
 }
 
@@ -633,7 +663,7 @@ func (a *Adapter) query(conn *sqlite.Conn, fields []string, param moleculer.Payl
 	}
 	selec = selec + " ;"
 
-	a.log.Debug(selec)
+	a.log.Trace(selec)
 	if err := sqlitex.Exec(conn, selec, func(stmt *sqlite.Stmt) error {
 		rows = append(rows, mapRow(fields, stmt))
 		return nil
@@ -641,7 +671,7 @@ func (a *Adapter) query(conn *sqlite.Conn, fields []string, param moleculer.Payl
 		a.log.Error("Error on select: ", err)
 		return payload.New(err)
 	}
-	a.log.Debug("rows: ", rows)
+	a.log.Trace("rows: ", rows)
 	return payload.New(rows)
 }
 
@@ -714,6 +744,9 @@ func (a *Adapter) transformOut(field string, value interface{}) interface{} {
 		c = a.idColumn
 	}
 	t := c.Type
+	if t == "bool" {
+		return value.(string) == "1"
+	}
 	if t == "[]string" {
 		return strings.Split(value.(string), listSeparator)
 	}
