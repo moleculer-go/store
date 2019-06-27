@@ -16,7 +16,15 @@ import (
 
 var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == "true"))
 
-var mongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
+func mongoTestHost() string {
+	env := os.Getenv("MONGO_TEST_HOST")
+	if env == "" {
+		return "localhost:27017"
+	}
+	return env
+}
+
+var mongoTestsHost = "mongodb://" + mongoTestHost()
 
 func mongoAdapter(database, collection string) *MongoAdapter {
 	fmt.Println("mongoTestsHost: ", mongoTestsHost)

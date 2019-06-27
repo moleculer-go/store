@@ -19,7 +19,15 @@ var snap = cupaloy.New(cupaloy.FailOnUpdate(os.Getenv("UPDATE_SNAPSHOTS") == "tr
 
 var logLevel = "error"
 
-var mongoTestsHost = "mongodb://" + os.Getenv("MONGO_TEST_HOST")
+func mongoTestHost() string {
+	env := os.Getenv("MONGO_TEST_HOST")
+	if env == "" {
+		return "localhost"
+	}
+	return env
+}
+
+var mongoTestsHost = "mongodb://" + mongoTestHost()
 
 var _ = Describe("Moleculer DB Integration Tests", func() {
 
