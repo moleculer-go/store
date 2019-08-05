@@ -3,6 +3,8 @@ package sqlite
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -22,6 +24,56 @@ import (
 type Column struct {
 	Name string
 	Type string
+}
+
+func FileCopyBackup(name, uri, backupFolder string) error {
+	//validate if is an file URI
+	if strings.Contains(uri, "file:memory") {
+		return errors.New("Cannot file copy backup an in memory database!")
+	}
+	return copyFolder(uri, backupFolder+"/"+name+"/")
+}
+
+func copyFolder(source string, dest string) (err error) {
+	sourceInfo, err := os.Stat(source)
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll(dest, sourceInfo.Mode())
+	if err != nil {
+		return err
+	}
+	directory, _ := os.Open(source)
+	objects, err := directory.Readdir(-1)
+	for _, obj := range objects {
+		sourcePointer := source + "/" + obj.Name()
+		destinationPointer := dest + "/" + obj.Name()
+		if obj.IsDir() {
+			err = copyFolder(sourcePointer, destinationPointer)
+			if err != nil {
+				return err
+			}
+		} else {
+			sourceFile, err := os.Open(source)
+			if err != nil {
+				return err
+			}
+			defer sourceFile.Close()
+			destfile, err := os.Create(dest)
+			if err != nil {
+				return err
+			}
+			defer destfile.Close()
+			_, err = io.Copy(destfile, sourceFile)
+			if err == nil {
+				sourceInfo, err := os.Stat(source)
+				if err != nil {
+					err = os.Chmod(dest, sourceInfo.Mode())
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type Adapter struct {
