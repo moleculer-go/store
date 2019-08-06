@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -29,9 +30,13 @@ type Column struct {
 func FileCopyBackup(name, uri, backupFolder string) error {
 	//validate if is an file URI
 	if strings.Contains(uri, "file:memory") {
-		return errors.New("Cannot file copy backup an in memory database!")
+		return errors.New("cannot file copy backup an in memory database")
 	}
-	return copyFolder(uri, backupFolder+"/"+name+"/")
+	return copyFolder(uriToDBFolder(uri), backupFolder+"/"+name)
+}
+
+func uriToDBFolder(uri string) string {
+	return filepath.Dir(strings.ReplaceAll(uri, "file:", ""))
 }
 
 func copyFolder(source string, dest string) (err error) {
@@ -54,12 +59,12 @@ func copyFolder(source string, dest string) (err error) {
 				return err
 			}
 		} else {
-			sourceFile, err := os.Open(source)
+			sourceFile, err := os.Open(sourcePointer)
 			if err != nil {
 				return err
 			}
 			defer sourceFile.Close()
-			destfile, err := os.Create(dest)
+			destfile, err := os.Create(destinationPointer)
 			if err != nil {
 				return err
 			}
