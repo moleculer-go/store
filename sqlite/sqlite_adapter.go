@@ -3,9 +3,6 @@ package sqlite
 import (
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -27,59 +24,17 @@ type Column struct {
 	Type string
 }
 
-func FileCopyBackup(name, uri, backupFolder string) error {
-	//validate if is an file URI
-	if strings.Contains(uri, "file:memory") {
-		return errors.New("cannot file copy backup an in memory database")
-	}
-	return copyFolder(uriToDBFolder(uri), backupFolder+"/"+name)
-}
+// func FileCopyBackup(name, uri, backupFolder string) error {
+// 	//validate if is an file URI
+// 	if strings.Contains(uri, "file:memory") {
+// 		return errors.New("cannot file copy backup an in memory database")
+// 	}
+// 	return copyFolder(uriToDBFolder(uri), backupFolder+"/"+name)
+// }
 
-func uriToDBFolder(uri string) string {
-	return filepath.Dir(strings.ReplaceAll(uri, "file:", ""))
-}
-
-func copyFolder(source string, dest string) (err error) {
-	sourceInfo, err := os.Stat(source)
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(dest, sourceInfo.Mode())
-	if err != nil {
-		return err
-	}
-	directory, _ := os.Open(source)
-	objects, err := directory.Readdir(-1)
-	for _, obj := range objects {
-		sourcePointer := source + "/" + obj.Name()
-		destinationPointer := dest + "/" + obj.Name()
-		if obj.IsDir() {
-			err = copyFolder(sourcePointer, destinationPointer)
-			if err != nil {
-				return err
-			}
-		} else {
-			sourceFile, err := os.Open(sourcePointer)
-			if err != nil {
-				return err
-			}
-			defer sourceFile.Close()
-			destfile, err := os.Create(destinationPointer)
-			if err != nil {
-				return err
-			}
-			defer destfile.Close()
-			_, err = io.Copy(destfile, sourceFile)
-			if err == nil {
-				sourceInfo, err := os.Stat(source)
-				if err != nil {
-					err = os.Chmod(dest, sourceInfo.Mode())
-				}
-			}
-		}
-	}
-	return nil
-}
+// func uriToDBFolder(uri string) string {
+// 	return filepath.Dir(strings.ReplaceAll(uri, "file:", ""))
+// }
 
 type Adapter struct {
 	URI      string
@@ -862,7 +817,82 @@ func (a *Adapter) columnType(field string) (r string) {
 	return r
 }
 
-func (a *Adapter) wrapValue(cType string, value moleculer.Payload) (r string) {
+//betweenValues prepare the values for the operator "between" sql stmt -> between  A and B
+func (a *Adapter) betweenValues(field string, values moleculer.Payload) (r string) {
+	pair := values.Array()
+	return a.wrapValue(field, pair[0]) + " AND " + a.wrapValue(field, pair[1])
+}
+
+//inValues prepare the values for the operator "in" sql stmt -> in (A, B, C)
+func (a *Adapter) inValues(field string, values moleculer.Payload) (r string) {
+	items := []string{}
+	values.ForEach(func(key interface{}, item moleculer.Payload) bool {
+		items = append(items, a.wrapValue(field, item))
+		return true
+	})
+	return "(" + strings.Join(items, ",") + ")"
+}
+
+func (a *Adapter) orValues(values moleculer.Payload) (r string) {
+	pairs := []string{}
+	values.ForEach(func(idx interface{}, query moleculer.Payload) bool {
+		for _, pair := range a.filterPairs(query) {
+			pairs = append(pairs, pair)
+		}
+		return true
+	})
+	return strings.Join(pairs, " OR ")
+}
+
+//expressionValue when the filter clause is an expression, this function will
+//return the operator and the values formated for SQLStmts
+func (a *Adapter) expressionValue(field string, expression moleculer.Payload) (rField, value, operation string) {
+	rField = field
+	if strings.ToLower(field) == "or" {
+		rField = ""
+		value = a.orValues(expression)
+	} else {
+		expression.ForEach(func(key interface{}, item moleculer.Payload) bool {
+			operation = strings.ToLower(key.(string))
+			if operation == "between" || operation == "not between" {
+				value = a.betweenValues(field, item)
+			} else if operation == "in" || operation == "not in" {
+				value = a.inValues(field, item)
+			} else {
+				value = a.wrapValue(field, item)
+			}
+			return false
+		})
+	}
+	return rField, value, operation
+}
+
+//valueAndOperator return the value properly formated for SQL Stmt and the operator to be used in the where clause.
+func (a *Adapter) valueAndOperator(field string, expression moleculer.Payload) (pair string) {
+	operation := "="
+	value := ""
+	if expression.IsMap() || expression.IsArray() {
+		field, value, operation = a.expressionValue(field, expression)
+	} else {
+		value = a.wrapValue(field, expression)
+	}
+	if a.isExpression(expression.String()) {
+		operation = " "
+	}
+	return strings.TrimSpace(field + " " + operation + " " + value)
+}
+
+func (a *Adapter) isExpression(value string) bool {
+	value = strings.ToUpper(value)
+	return value == "IS NOT NULL" || value == "IS NULL"
+}
+
+func (a *Adapter) wrapValue(field string, value moleculer.Payload) (r string) {
+	if a.isExpression(value.String()) {
+		return strings.ToUpper(value.String())
+	}
+
+	cType := a.columnType(field)
 	if cType == "TEXT" || cType == "" {
 		return "'" + value.String() + "'"
 	}
@@ -872,15 +902,23 @@ func (a *Adapter) wrapValue(cType string, value moleculer.Payload) (r string) {
 	if cType == "INTEGER" {
 		return fmt.Sprint(value.Int64())
 	}
-
 	return r
 }
 
+//filterPairs create the where clause filter pairs: example. userName = 'John'
+//uses a mongo-esq style for advanced filters, examples:
+// "query": M{
+// 	"age": M{
+// 		">": 60,
+// 	},
+// },
+//will result in:
+// where age > 60
 func (a *Adapter) filterPairs(query moleculer.Payload) (pairs []string) {
 	query.ForEach(func(key interface{}, item moleculer.Payload) bool {
 		field := key.(string)
-		value := a.wrapValue(a.columnType(field), item)
-		pairs = append(pairs, field+" = "+value)
+		pair := a.valueAndOperator(field, item)
+		pairs = append(pairs, pair)
 		return true
 	})
 	return pairs

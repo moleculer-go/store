@@ -1,6 +1,8 @@
 package sqlite
 
 import (
+	"fmt"
+
 	"github.com/moleculer-go/sqlite"
 	"github.com/moleculer-go/sqlite/sqlitex"
 
@@ -424,6 +426,212 @@ var _ = Describe("Sqlite", func() {
 
 			r = adapter.Count(payload.Empty())
 			Expect(r.Int()).Should(Equal(0))
+		})
+
+	})
+
+	Describe("Find advanced queries / filters", func() {
+		var adapter Adapter
+		BeforeEach(func() {
+			adapter = Adapter{
+				URI:      "file:memory:?mode=memory",
+				Flags:    0,
+				PoolSize: 1,
+				Table:    "advancedFilters",
+				Columns: []Column{
+					{
+						Name: "name",
+						Type: "TEXT",
+					},
+					{
+						Name: "email",
+						Type: "TEXT",
+					},
+					{
+						Name: "age",
+						Type: "INTEGER",
+					},
+					{
+						Name: "letter",
+						Type: "TEXT",
+					},
+				},
+			}
+			log.SetLevel(logLevel)
+			adapter.Init(log.WithField("", ""), M{})
+			adapter.Connect()
+			adapter.Insert(payload.New(M{
+				"name":   "Jackson",
+				"email":  "Jackson@five.com",
+				"age":    5,
+				"letter": "J",
+			}))
+
+			adapter.Insert(payload.New(M{
+				"name":   "Michael",
+				"email":  "michael@five.com",
+				"age":    35,
+				"letter": "M",
+			}))
+
+			adapter.Insert(payload.New(M{
+				"name":   "Mario",
+				"email":  "mario@silva.com",
+				"age":    37,
+				"letter": "M",
+			}))
+
+			adapter.Insert(payload.New(M{
+				"name":   "Anderson",
+				"email":  "Zabib@ufc.com",
+				"age":    15,
+				"letter": "A",
+			}))
+
+			adapter.Insert(payload.New(M{
+				"name":   "Connor",
+				"email":  "connor@ufc.com",
+				"letter": "C",
+			}))
+
+			adapter.Insert(payload.New(M{
+				"name":   "Zabib",
+				"email":  "zabib@nmgv.com",
+				"age":    28,
+				"letter": "Z",
+			}))
+
+		})
+
+		AfterEach(func() {
+			adapter.Disconnect()
+		})
+
+		It("should find people with age bellow 20", func() {
+			r := adapter.Find(payload.New(M{"query": M{"age": M{"<": 20}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(2))
+		})
+
+		It("should find people with age bellow or equal to 28", func() {
+			r := adapter.Find(payload.New(M{"query": M{"age": M{"<=": 28}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(3))
+		})
+
+		It("should find people with age above 30", func() {
+			r := adapter.Find(payload.New(M{"query": M{"age": M{">": 30}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(2))
+		})
+
+		It("should find people with age between 15 and 36", func() {
+			r := adapter.Find(payload.New(M{"query": M{"age": M{"between": []int{15, 36}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(3))
+		})
+
+		It("should find people with letter between A and Z", func() {
+			r := adapter.Find(payload.New(M{"query": M{"letter": M{"between": []string{"A", "Z"}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(6))
+		})
+
+		It("should find people with letter between B and M", func() {
+			r := adapter.Find(payload.New(M{"query": M{"letter": M{"between": []string{"B", "M"}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(4))
+		})
+
+		It("should find people with letter NOT between B and M", func() {
+			r := adapter.Find(payload.New(M{"query": M{"letter": M{"not between": []string{"B", "M"}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			fmt.Println("not between rows: ", r)
+			Expect(r.Len()).Should(Equal(2))
+		})
+
+		It("should find people with letter NOT between B and M OR @ufc email", func() {
+			r := adapter.Find(payload.New(M{"query": M{"or": []M{
+				M{"letter": M{"not between": []string{"B", "M"}}},
+				M{"email": M{"like": "%@ufc%"}},
+			}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(3))
+
+			r = adapter.Find(payload.New(M{"query": M{"or": []M{
+				M{"name": "Mario"},
+				M{"name": "Anderson"},
+			}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(2))
+		})
+
+		It("should find people with @ufc email", func() {
+			r := adapter.Find(payload.New(M{"query": M{"email": M{"like": "%@ufc%"}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(2))
+		})
+
+		It("should find people with @five.com email", func() {
+			r := adapter.Find(payload.New(M{"query": M{"email": M{"like": "%@five.com"}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(2))
+		})
+
+		It("should find people with age in the list of 5, 35, 37 and 200", func() {
+			r := adapter.Find(payload.New(M{"query": M{"age": M{"in": []int{5, 35, 37, 200}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(3))
+		})
+
+		It("should find people with age NOT in the list of 35, 37 and 200", func() {
+			r := adapter.Find(payload.New(M{"query": M{"age": M{"not in": []int{5, 35, 37, 200}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(2))
+		})
+
+		It("should find people with letter in the list of M, J and Y", func() {
+			r := adapter.Find(payload.New(M{"query": M{"letter": M{"in": []string{"M", "J", "Y"}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(3))
+		})
+
+		It("should find people with letter different than M", func() {
+			r := adapter.Find(payload.New(M{"query": M{"letter": M{"<>": "M"}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(4))
+
+			r = adapter.Find(payload.New(M{"query": M{"letter": M{"!=": "J"}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(5))
+		})
+
+		It("should find people where email is not null", func() {
+			r := adapter.Find(payload.New(M{"query": M{"age": "is not null"}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(5))
+
+			r = adapter.Find(payload.New(M{"query": M{"age": "IS NULL"}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(BeNil())
+			Expect(r.Len()).Should(Equal(1))
 		})
 
 	})
