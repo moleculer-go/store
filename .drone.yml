@@ -20,7 +20,7 @@ steps:
         from_secret: COVERALLS_TOKEN
     commands:
       - export MONGO_TEST_HOST="mongo"
-      - go run github.com/onsi/ginkgo/ginkgo -r --randomizeAllSpecs --failFast --cover --trace
+      - go run github.com/onsi/ginkgo/ginkgo -r -randomizeAllSpecs -cover -trace
       - go run github.com/modocache/gover ./ coverage.txt
       - curl -s https://codecov.io/bash | bash || echo "Failed to upload to codecov!"
       - go run github.com/mattn/goveralls -coverprofile=coverage.txt -service=drone.io || echo "Failed to upload to coverrals!"
