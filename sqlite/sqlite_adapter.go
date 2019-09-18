@@ -110,7 +110,7 @@ func (a *Adapter) Connect() error {
 	if a.connected {
 		return nil
 	}
-	pool, err := sqlitex.Open(a.URI, a.Flags, a.PoolSize) //a.poolFromCache()
+	pool, err := sqlitex.Open(a.URI, a.Flags, a.PoolSize)
 	if err != nil {
 		a.log.Error("Could not connect to SQLite - error: ", err)
 		return errors.New(fmt.Sprint("Could not connect to SQLite - error: ", err))
@@ -266,17 +266,21 @@ func placeholders(c []string) []string {
 }
 
 func (a *Adapter) loadSettings(settings map[string]interface{}) {
-	idField, hasIdField := settings["idField"].(string)
-	if !hasIdField {
-		idField = "id"
+	if idField, ok := settings["idField"].(string); ok {
+		a.idField = idField
+	} else {
+		a.idField = "id"
 	}
 
-	fields, hasFields := settings["fields"].([]string)
-	if !hasFields {
-		fields = []string{"**"}
+	if fields, ok := settings["fields"].([]string); ok {
+		a.fields = fields
+	} else {
+		a.fields = []string{"**"}
 	}
-	a.fields = fields
-	a.idField = idField
+
+	if uri, ok := settings["uri"].(string); ok {
+		a.URI = uri
+	}
 }
 
 // columnsDefinition return the column definitions for CREATE TABLE
@@ -302,7 +306,7 @@ func (a *Adapter) createTable() error {
 		}
 		defer a.returnConn(conn)
 
-		create := "CREATE TABLE " + a.Table + " (" + strings.Join(a.columnsDefinition(), ", ") + ");"
+		create := "CREATE TABLE IF NOT EXISTS " + a.Table + " (" + strings.Join(a.columnsDefinition(), ", ") + ");"
 		a.log.Debug(create)
 
 		err := sqlitex.ExecTransient(conn, create, nil)
@@ -335,12 +339,12 @@ func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
-	resChan := make(chan moleculer.Payload, 1)
+	results := make(chan moleculer.Payload, 1)
 	go func() {
-		defer a.catchConnError("Error on find and update", resChan)
+		defer a.catchConnError("Error on find and update", results)
 		conn := a.getConn()
 		if conn == nil {
-			resChan <- noConnectionError()
+			results <- noConnectionError()
 			return
 		}
 		defer a.returnConn(conn)
@@ -349,7 +353,7 @@ func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
 
 		originals := a.query(conn, a.findFields(param), param, a.rowToPayload)
 		if originals.IsError() {
-			resChan <- originals
+			results <- originals
 			return
 		}
 		result := []moleculer.Payload{}
@@ -365,9 +369,9 @@ func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
 				result = append(result, updated)
 			}
 		}
-		resChan <- payload.New(result)
+		results <- payload.New(result)
 	}()
-	return <-resChan
+	return <-results
 }
 
 func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
@@ -379,22 +383,22 @@ func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
-	resChan := make(chan moleculer.Payload, 1)
+	results := make(chan moleculer.Payload, 1)
 	go func() {
-		defer a.catchConnError("Error on update by id: "+id.String(), resChan)
+		defer a.catchConnError("Error on update by id: "+id.String(), results)
 		conn := a.getConn()
 		if conn == nil {
-			resChan <- noConnectionError()
+			results <- noConnectionError()
 			return
 		}
 		defer a.returnConn(conn)
 		if err := a.updateById(conn, id, update); err != nil {
-			resChan <- payload.New(err)
+			results <- payload.New(err)
 			return
 		}
-		resChan <- a.findById(conn, id)
+		results <- a.findById(conn, id)
 	}()
-	return <-resChan
+	return <-results
 }
 
 func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
