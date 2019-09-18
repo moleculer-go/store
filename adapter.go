@@ -156,6 +156,10 @@ func listAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) mo
 		if params.Get("page").Exists() {
 			page = params.Get("page").Int()
 		}
+		total := payload.New(nil)
+		if params.Get("total").Exists() && params.Get("total").Int() > 0 {
+			total = params.Get("total")
+		}
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -168,7 +172,9 @@ func listAction(adapter Adapter, getInstance func() *moleculer.ServiceSchema) mo
 			}))
 			wg.Done()
 		}()
-		total := adapter.Count(params)
+		if !total.Exists() {
+			total = adapter.Count(params)
+		}
 		wg.Wait()
 		totalPages := math.Floor(
 			(total.Float() + float64(pageSize) - 1.0) / float64(pageSize))

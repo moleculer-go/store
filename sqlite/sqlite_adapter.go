@@ -24,6 +24,18 @@ type Column struct {
 	Type string
 }
 
+// func FileCopyBackup(name, uri, backupFolder string) error {
+// 	//validate if is an file URI
+// 	if strings.Contains(uri, "file:memory") {
+// 		return errors.New("cannot file copy backup an in memory database")
+// 	}
+// 	return copyFolder(uriToDBFolder(uri), backupFolder+"/"+name)
+// }
+
+// func uriToDBFolder(uri string) string {
+// 	return filepath.Dir(strings.ReplaceAll(uri, "file:", ""))
+// }
+
 type Adapter struct {
 	URI      string
 	Flags    sqlite.OpenFlags
@@ -98,7 +110,7 @@ func (a *Adapter) Connect() error {
 	if a.connected {
 		return nil
 	}
-	pool, err := sqlitex.Open(a.URI, a.Flags, a.PoolSize) //a.poolFromCache()
+	pool, err := sqlitex.Open(a.URI, a.Flags, a.PoolSize)
 	if err != nil {
 		a.log.Error("Could not connect to SQLite - error: ", err)
 		return errors.New(fmt.Sprint("Could not connect to SQLite - error: ", err))
@@ -254,17 +266,21 @@ func placeholders(c []string) []string {
 }
 
 func (a *Adapter) loadSettings(settings map[string]interface{}) {
-	idField, hasIdField := settings["idField"].(string)
-	if !hasIdField {
-		idField = "id"
+	if idField, ok := settings["idField"].(string); ok {
+		a.idField = idField
+	} else {
+		a.idField = "id"
 	}
 
-	fields, hasFields := settings["fields"].([]string)
-	if !hasFields {
-		fields = []string{"**"}
+	if fields, ok := settings["fields"].([]string); ok {
+		a.fields = fields
+	} else {
+		a.fields = []string{"**"}
 	}
-	a.fields = fields
-	a.idField = idField
+
+	if uri, ok := settings["uri"].(string); ok {
+		a.URI = uri
+	}
 }
 
 // columnsDefinition return the column definitions for CREATE TABLE
@@ -290,7 +306,7 @@ func (a *Adapter) createTable() error {
 		}
 		defer a.returnConn(conn)
 
-		create := "CREATE TABLE " + a.Table + " (" + strings.Join(a.columnsDefinition(), ", ") + ");"
+		create := "CREATE TABLE IF NOT EXISTS " + a.Table + " (" + strings.Join(a.columnsDefinition(), ", ") + ");"
 		a.log.Debug(create)
 
 		err := sqlitex.ExecTransient(conn, create, nil)
@@ -323,12 +339,12 @@ func (a *Adapter) Find(param moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
-	resChan := make(chan moleculer.Payload, 1)
+	results := make(chan moleculer.Payload, 1)
 	go func() {
-		defer a.catchConnError("Error on find and update", resChan)
+		defer a.catchConnError("Error on find and update", results)
 		conn := a.getConn()
 		if conn == nil {
-			resChan <- noConnectionError()
+			results <- noConnectionError()
 			return
 		}
 		defer a.returnConn(conn)
@@ -337,7 +353,7 @@ func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
 
 		originals := a.query(conn, a.findFields(param), param, a.rowToPayload)
 		if originals.IsError() {
-			resChan <- originals
+			results <- originals
 			return
 		}
 		result := []moleculer.Payload{}
@@ -353,9 +369,9 @@ func (a *Adapter) FindAndUpdate(param moleculer.Payload) moleculer.Payload {
 				result = append(result, updated)
 			}
 		}
-		resChan <- payload.New(result)
+		results <- payload.New(result)
 	}()
-	return <-resChan
+	return <-results
 }
 
 func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
@@ -367,22 +383,22 @@ func (a *Adapter) Update(params moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
-	resChan := make(chan moleculer.Payload, 1)
+	results := make(chan moleculer.Payload, 1)
 	go func() {
-		defer a.catchConnError("Error on update by id: "+id.String(), resChan)
+		defer a.catchConnError("Error on update by id: "+id.String(), results)
 		conn := a.getConn()
 		if conn == nil {
-			resChan <- noConnectionError()
+			results <- noConnectionError()
 			return
 		}
 		defer a.returnConn(conn)
 		if err := a.updateById(conn, id, update); err != nil {
-			resChan <- payload.New(err)
+			results <- payload.New(err)
 			return
 		}
-		resChan <- a.findById(conn, id)
+		results <- a.findById(conn, id)
 	}()
-	return <-resChan
+	return <-results
 }
 
 func (a *Adapter) Insert(param moleculer.Payload) moleculer.Payload {
@@ -805,7 +821,82 @@ func (a *Adapter) columnType(field string) (r string) {
 	return r
 }
 
-func (a *Adapter) wrapValue(cType string, value moleculer.Payload) (r string) {
+//betweenValues prepare the values for the operator "between" sql stmt -> between  A and B
+func (a *Adapter) betweenValues(field string, values moleculer.Payload) (r string) {
+	pair := values.Array()
+	return a.wrapValue(field, pair[0]) + " AND " + a.wrapValue(field, pair[1])
+}
+
+//inValues prepare the values for the operator "in" sql stmt -> in (A, B, C)
+func (a *Adapter) inValues(field string, values moleculer.Payload) (r string) {
+	items := []string{}
+	values.ForEach(func(key interface{}, item moleculer.Payload) bool {
+		items = append(items, a.wrapValue(field, item))
+		return true
+	})
+	return "(" + strings.Join(items, ",") + ")"
+}
+
+func (a *Adapter) orValues(values moleculer.Payload) (r string) {
+	pairs := []string{}
+	values.ForEach(func(idx interface{}, query moleculer.Payload) bool {
+		for _, pair := range a.filterPairs(query) {
+			pairs = append(pairs, pair)
+		}
+		return true
+	})
+	return strings.Join(pairs, " OR ")
+}
+
+//expressionValue when the filter clause is an expression, this function will
+//return the operator and the values formated for SQLStmts
+func (a *Adapter) expressionValue(field string, expression moleculer.Payload) (rField, value, operation string) {
+	rField = field
+	if strings.ToLower(field) == "or" {
+		rField = ""
+		value = a.orValues(expression)
+	} else {
+		expression.ForEach(func(key interface{}, item moleculer.Payload) bool {
+			operation = strings.ToLower(key.(string))
+			if operation == "between" || operation == "not between" {
+				value = a.betweenValues(field, item)
+			} else if operation == "in" || operation == "not in" {
+				value = a.inValues(field, item)
+			} else {
+				value = a.wrapValue(field, item)
+			}
+			return false
+		})
+	}
+	return rField, value, operation
+}
+
+//valueAndOperator return the value properly formated for SQL Stmt and the operator to be used in the where clause.
+func (a *Adapter) valueAndOperator(field string, expression moleculer.Payload) (pair string) {
+	operation := "="
+	value := ""
+	if expression.IsMap() || expression.IsArray() {
+		field, value, operation = a.expressionValue(field, expression)
+	} else {
+		value = a.wrapValue(field, expression)
+	}
+	if a.isExpression(expression.String()) {
+		operation = " "
+	}
+	return strings.TrimSpace(field + " " + operation + " " + value)
+}
+
+func (a *Adapter) isExpression(value string) bool {
+	value = strings.ToUpper(value)
+	return value == "IS NOT NULL" || value == "IS NULL"
+}
+
+func (a *Adapter) wrapValue(field string, value moleculer.Payload) (r string) {
+	if a.isExpression(value.String()) {
+		return strings.ToUpper(value.String())
+	}
+
+	cType := a.columnType(field)
 	if cType == "TEXT" || cType == "" {
 		return "'" + value.String() + "'"
 	}
@@ -815,15 +906,23 @@ func (a *Adapter) wrapValue(cType string, value moleculer.Payload) (r string) {
 	if cType == "INTEGER" {
 		return fmt.Sprint(value.Int64())
 	}
-
 	return r
 }
 
+//filterPairs create the where clause filter pairs: example. userName = 'John'
+//uses a mongo-esq style for advanced filters, examples:
+// "query": M{
+// 	"age": M{
+// 		">": 60,
+// 	},
+// },
+//will result in:
+// where age > 60
 func (a *Adapter) filterPairs(query moleculer.Payload) (pairs []string) {
 	query.ForEach(func(key interface{}, item moleculer.Payload) bool {
 		field := key.(string)
-		value := a.wrapValue(a.columnType(field), item)
-		pairs = append(pairs, field+" = "+value)
+		pair := a.valueAndOperator(field, item)
+		pairs = append(pairs, pair)
 		return true
 	})
 	return pairs

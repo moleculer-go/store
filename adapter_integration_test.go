@@ -42,7 +42,7 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 			var johnSnow, maria, johnT moleculer.Payload
 			var bkr *broker.ServiceBroker
 			BeforeEach(func() {
-				//ready := make(chan bool, 1)
+				ready := make(chan bool, 1)
 				bkr = broker.New(&moleculer.Config{
 					DiscoverNodeID: func() string { return "node_populates" },
 					LogLevel:       logLevel,
@@ -59,12 +59,12 @@ var _ = Describe("Moleculer DB Integration Tests", func() {
 					Mixins: []moleculer.Mixin{store.Mixin(adapter)},
 					Started: func(c moleculer.BrokerContext, svc moleculer.ServiceSchema) {
 						johnSnow, maria, johnT = mocks.LoadUsers(adapter)
-						//ready <- true
+						ready <- true
 					},
 				}
 				bkr.Publish(userService)
 				bkr.Start()
-				//<-ready
+				<-ready
 			})
 
 			AfterEach(func() {
