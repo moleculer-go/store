@@ -3,8 +3,8 @@ package sqlite
 import (
 	"fmt"
 
-	"github.com/moleculer-go/sqlite"
-	"github.com/moleculer-go/sqlite/sqlitex"
+	"crawshaw.io/sqlite"
+	"crawshaw.io/sqlite/sqlitex"
 
 	"github.com/moleculer-go/moleculer"
 

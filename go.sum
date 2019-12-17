@@ -1,3 +1,7 @@
+crawshaw.io/iox v0.0.0-20181124134642-c51c3df30797 h1:yDf7ARQc637HoxDho7xjqdvO5ZA2Yb+xzv/fOnnvZzw=
+crawshaw.io/iox v0.0.0-20181124134642-c51c3df30797/go.mod h1:sXBiorCo8c46JlQV3oXPKINnZ8mcqnye1EkVkqsectk=
+crawshaw.io/sqlite v0.2.0 h1:KYWbuV1q+BcvoDSl8n6IT+uVLHP7+0+y9eE1VbVTrvc=
+crawshaw.io/sqlite v0.2.0/go.mod h1:igAO5JulrQ1DbdZdtVq48mnZUBAPOeFzer7VhDWNtW4=
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/DataDog/datadog-go v2.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
@@ -66,8 +70,6 @@ github.com/moleculer-go/moleculer v0.2.1 h1:89tno00ZerwDTNGHbIvBH+jYD1tAuHepsfq4
 github.com/moleculer-go/moleculer v0.2.1/go.mod h1:I4KjTCDbQc127mY2vH84X7T4t7IHlvd5AcapsDeoQCY=
 github.com/moleculer-go/spew v1.2.0 h1:Ko5FrSdx9ssnYhjS6OMgMFtN6omV4ZfVccljU8Ccth0=
 github.com/moleculer-go/spew v1.2.0/go.mod h1:R1AWW56BWfDlXLJ6i5YB4uWzqhI1iiE6dU6MJ4w2iiE=
-github.com/moleculer-go/sqlite v0.1.3 h1:/gfRsOKQ8yDU8KVeAhRxPyCTPPCJaQAxVY10DnqiVHw=
-github.com/moleculer-go/sqlite v0.1.3/go.mod h1:sUALpdiDMmE8b9YsLQKZ+e0yeQAuT7vKyeWa4jt7nqU=
 github.com/nats-io/gnatsd v1.4.1 h1:RconcfDeWpKCD6QIIwiVFcvForlXpWeJP7i5/lDLy44=
 github.com/nats-io/gnatsd v1.4.1/go.mod h1:nqco77VO78hLCJpIcVfygDP2rPGfsEHkGTUk94uh5DQ=
 github.com/nats-io/go-nats v1.7.2 h1:cJujlwCYR8iMz5ofZSD/p2WLW8FabhkQ2lIEVbSvNSA=
