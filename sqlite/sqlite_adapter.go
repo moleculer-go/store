@@ -19,22 +19,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	//YYYY-MM-DD HH:MM:SS.SSS -> SQLIte format
+	ISO8601 = "2006-01-02 15:04:05.000"
+)
+
 type Column struct {
 	Name string
 	Type string
 }
-
-// func FileCopyBackup(name, uri, backupFolder string) error {
-// 	//validate if is an file URI
-// 	if strings.Contains(uri, "file:memory") {
-// 		return errors.New("cannot file copy backup an in memory database")
-// 	}
-// 	return copyFolder(uriToDBFolder(uri), backupFolder+"/"+name)
-// }
-
-// func uriToDBFolder(uri string) string {
-// 	return filepath.Dir(strings.ReplaceAll(uri, "file:", ""))
-// }
 
 type Adapter struct {
 	URI      string
@@ -741,6 +734,14 @@ func (a *Adapter) transformIn(field string, value interface{}) interface{} {
 		}
 		return strings.Join(sList, listSeparator)
 	}
+	if t == "date" || t == "datetime" {
+		t, valid := value.(time.Time)
+		if !valid {
+			return nil
+		}
+		v := t.UTC().Format(ISO8601)
+		return v
+	}
 	return value
 }
 
@@ -795,6 +796,9 @@ func (a *Adapter) rowToPayload(fields []string, stmt *sqlite.Stmt) moleculer.Pay
 
 func dbType(t string) string {
 	if t == "string" {
+		return "TEXT"
+	}
+	if t == "date" || t == "datetime" {
 		return "TEXT"
 	}
 	if t == "[]string" {
@@ -897,6 +901,10 @@ func (a *Adapter) wrapValue(field string, value moleculer.Payload) (r string) {
 	}
 
 	cType := a.columnType(field)
+	if cType == "TEXT" && isTime(value) {
+		t, _ := value.Value().(time.Time)
+		return "'" + t.UTC().Format(ISO8601) + "'"
+	}
 	if cType == "TEXT" || cType == "" {
 		return "'" + value.String() + "'"
 	}
@@ -907,6 +915,11 @@ func (a *Adapter) wrapValue(field string, value moleculer.Payload) (r string) {
 		return fmt.Sprint(value.Int64())
 	}
 	return r
+}
+
+func isTime(p moleculer.Payload) bool {
+	_, valid := p.Value().(time.Time)
+	return valid
 }
 
 //filterPairs create the where clause filter pairs: example. userName = 'John'

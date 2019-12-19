@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"fmt"
+	"time"
 
 	"crawshaw.io/sqlite"
 	"crawshaw.io/sqlite/sqlitex"
@@ -634,5 +635,98 @@ var _ = Describe("Sqlite", func() {
 			Expect(r.Len()).Should(Equal(1))
 		})
 
+	})
+
+	Describe("Date and Datetime", func() {
+		var adapter Adapter
+		BeforeEach(func() {
+			adapter = Adapter{
+				URI:      "file:memory:?mode=memory",
+				Flags:    0,
+				PoolSize: 1,
+				Table:    "dates",
+				Columns: []Column{
+					{
+						Name: "title",
+						Type: "string",
+					},
+					{
+						Name: "created",
+						Type: "date",
+					},
+					{
+						Name: "updated",
+						Type: "datetime",
+					},
+				},
+			}
+			log.SetLevel(logLevel)
+			adapter.Init(log.WithField("", ""), M{})
+			adapter.Connect()
+
+			adapter.Insert(payload.New(M{
+				"title":   "day after tomorrow",
+				"created": time.Now().Add(time.Hour * 24 * 2),
+				"updated": time.Now().Add(time.Hour * 24 * 2),
+			}))
+
+			adapter.Insert(payload.New(M{
+				"title":   "today",
+				"created": time.Now(),
+				"updated": time.Now(),
+			}))
+
+			adapter.Insert(payload.New(M{
+				"title":   "tomorrow",
+				"created": time.Now().Add(time.Hour * 24),
+				"updated": time.Now().Add(time.Hour * 24),
+			}))
+
+		})
+
+		AfterEach(func() {
+			adapter.Disconnect()
+		})
+
+		It("should order by date", func() {
+			r := adapter.Find(payload.New(M{"sort": "created"}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(Succeed())
+			Expect(r.Len()).Should(Equal(3))
+			Expect(r.Array()[0].Get("title").String()).Should(Equal("today"))
+			Expect(r.Array()[1].Get("title").String()).Should(Equal("tomorrow"))
+			Expect(r.Array()[2].Get("title").String()).Should(Equal("day after tomorrow"))
+
+			r = adapter.Find(payload.New(M{"sort": "-created"}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(Succeed())
+			Expect(r.Len()).Should(Equal(3))
+			Expect(r.Array()[2].Get("title").String()).Should(Equal("today"))
+			Expect(r.Array()[1].Get("title").String()).Should(Equal("tomorrow"))
+			Expect(r.Array()[0].Get("title").String()).Should(Equal("day after tomorrow"))
+
+		})
+
+		It("should filter by date", func() {
+
+			r := adapter.Find(payload.New(M{"query": M{"updated": M{"between": []time.Time{time.Now().Add(-1 * time.Second), time.Now()}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(Succeed())
+			Expect(r.Len()).Should(Equal(1))
+			Expect(r.Array()[0].Get("title").String()).Should(Equal("today"))
+
+			r = adapter.Find(payload.New(M{"query": M{"updated": M{"between": []time.Time{time.Now().Add(((time.Hour * 24) - time.Second)), time.Now().Add(time.Hour * 24)}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(Succeed())
+			Expect(r.Len()).Should(Equal(1))
+			Expect(r.Array()[0].Get("title").String()).Should(Equal("tomorrow"))
+
+			r = adapter.Find(payload.New(M{"query": M{"updated": M{"between": []time.Time{time.Now().Add(((time.Hour * 24 * 2) - time.Second)), time.Now().Add(time.Hour * 24 * 2)}}}}))
+			Expect(r).ShouldNot(BeNil())
+			Expect(r.Error()).Should(Succeed())
+			Expect(r.Len()).Should(Equal(1))
+			Expect(r.Array()[0].Get("title").String()).Should(Equal("day after tomorrow"))
+
+		})
 	})
 })
