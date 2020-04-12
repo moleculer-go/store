@@ -142,7 +142,6 @@ func getList(params, search moleculer.Payload) moleculer.Payload {
 func (a *Adapter) Find(params moleculer.Payload) moleculer.Payload {
 
 	query := a.serializer.PayloadToString(parseFilter(params))
-
 	a.log.Traceln("Find() params: ", params, "query: ", query)
 
 	res, err := a.es.Search(

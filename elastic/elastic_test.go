@@ -51,12 +51,24 @@ var _ = Describe("Elastic", func() {
 		adapter.Connect()
 
 		content := util.RandomString(12)
+		name := util.RandomString(12)
 
-		adapter.Insert(payload.Empty().Add("field", content).Add("nome", "jose"))
+		adapter.Insert(payload.Empty().Add("field", content).Add("name", "jose"))
+
+		adapter.Insert(payload.Empty().Add("field", "content").Add("name", name))
 
 		r := adapter.Find(payload.New(map[string]interface{}{
 			"search":       content,
 			"searchFields": []string{"field"},
+		}))
+
+		Expect(r).ShouldNot(BeNil())
+		Expect(r.Error()).Should(Succeed())
+		Expect(r.Len()).Should(Equal(1))
+
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"search":       name,
+			"searchFields": []string{"name"},
 		}))
 
 		Expect(r).ShouldNot(BeNil())
