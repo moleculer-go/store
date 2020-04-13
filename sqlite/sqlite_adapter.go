@@ -198,6 +198,7 @@ func (a *Adapter) getConn() *sqlite.Conn {
 	return a.pool.Get(nil)
 }
 
+// updatePairs generate the update pairs (one list of columns and one of values) used for update statement.
 func (a *Adapter) updatePairs(param moleculer.Payload) ([]string, []interface{}) {
 	columns := []string{}
 	values := []interface{}{}

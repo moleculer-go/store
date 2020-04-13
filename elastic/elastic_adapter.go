@@ -159,7 +159,12 @@ func (a *Adapter) Find(params moleculer.Payload) moleculer.Payload {
 	if res.IsError() {
 		a.log.Error("error executing search - ", p.RawMap())
 	}
+
 	a.log.Traceln("Find() result:")
 	a.log.Traceln(p)
 	return getList(params, p)
+}
+
+func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {
+	return a.Find(params.Add("limit", 1)).First()
 }

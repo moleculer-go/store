@@ -43,7 +43,7 @@ var _ = Describe("Elastic", func() {
 		Expect(adapter.es).ShouldNot(BeNil())
 	})
 
-	It("should get a document", func() {
+	It("will insert 2 docs and should get one document that matches the search", func() {
 		adapter := Adapter{}
 		adapter.Init(logger, map[string]interface{}{
 			"indexName": "get_test_index",
@@ -69,6 +69,27 @@ var _ = Describe("Elastic", func() {
 		r = adapter.Find(payload.New(map[string]interface{}{
 			"search":       name,
 			"searchFields": []string{"name"},
+		}))
+
+		Expect(r).ShouldNot(BeNil())
+		Expect(r.Error()).Should(Succeed())
+		Expect(r.Len()).Should(Equal(1))
+	})
+
+	It("will insert 2 docs and should return just one using the limit parameter", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "limit_test_index",
+		})
+		adapter.Connect()
+
+		adapter.Insert(payload.Empty().Add("content", util.RandomString(12)).Add("name", "limited"))
+		adapter.Insert(payload.Empty().Add("content", util.RandomString(12)).Add("name", "limited"))
+
+		r := adapter.Find(payload.New(map[string]interface{}{
+			"search":       "limited",
+			"searchFields": []string{"name"},
+			"limit", 1,
 		}))
 
 		Expect(r).ShouldNot(BeNil())
