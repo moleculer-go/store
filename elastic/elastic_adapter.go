@@ -124,13 +124,32 @@ func parseSearchFields(params, query moleculer.Payload) moleculer.Payload {
 	return query
 }
 
+func parseQueryparams(params moleculer.Payload) moleculer.Payload {
+	r := payload.Empty()
+	if params.Get("limit").Exists() {
+		r = r.Add("size", params.Get("limit").Int())
+	}
+	if params.Get("offset").Exists() {
+		r = r.Add("from", params.Get("offset").Int())
+	}
+	// if params.Get("sort").Exists() {
+	// 	if param.Get("sort").IsArray() {
+	// 		sort = sortsFromStringArray(param.Get("sort"))
+	// 	} else {
+	// 		sort = sortsFromString(param.Get("sort"))
+	// 	}
+	// }
+	return r
+}
+
 func parseFilter(params moleculer.Payload) moleculer.Payload {
 	query := payload.Empty()
 	if params.Get("query").Exists() {
 		query = params.Get("query")
 	}
 	query = parseSearchFields(params, query)
-	return payload.Empty().Add("query", query)
+	queryParams := parseQueryparams(params)
+	return queryParams.Add("query", query)
 }
 
 func getList(params, search moleculer.Payload) moleculer.Payload {
