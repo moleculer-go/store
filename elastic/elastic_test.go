@@ -136,7 +136,6 @@ var _ = Describe("Elastic", func() {
 			"offset": 1,
 			"limit":  2,
 		}))
-		adapter.log.Infoln("result : ", r)
 		Expect(r.Len()).Should(Equal(2))
 		Expect(r.Array()[0].Get("name").String()).Should(Equal("2"))
 		Expect(r.Array()[1].Get("name").String()).Should(Equal("3"))
