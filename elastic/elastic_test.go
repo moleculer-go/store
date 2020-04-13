@@ -89,7 +89,7 @@ var _ = Describe("Elastic", func() {
 		r := adapter.Find(payload.New(map[string]interface{}{
 			"search":       "limited",
 			"searchFields": []string{"name"},
-			"limit", 1,
+			"limit":        1,
 		}))
 
 		Expect(r).ShouldNot(BeNil())
