@@ -120,7 +120,11 @@ func parseSearchFields(params, query moleculer.Payload) moleculer.Payload {
 		fields := searchFields.StringArray()
 		mm.Add("fields", fields)
 	}
-	query = query.Add("multi_match", mm)
+	if mm.Len() > 0 {
+		query = query.Add("multi_match", mm)
+	} else {
+		query = query.Add("match_all", payload.Empty())
+	}
 	return query
 }
 
@@ -152,10 +156,8 @@ func parseFilter(params moleculer.Payload) moleculer.Payload {
 	return queryParams.Add("query", query)
 }
 
-func getList(params, search moleculer.Payload) moleculer.Payload {
-	hits := search.Get("hits")
-	list := hits.Get("hits")
-	return list
+func getHits(params, search moleculer.Payload) moleculer.Payload {
+	return search.Get("hits").Get("hits")
 }
 
 func (a *Adapter) Find(params moleculer.Payload) moleculer.Payload {
@@ -179,9 +181,15 @@ func (a *Adapter) Find(params moleculer.Payload) moleculer.Payload {
 		a.log.Error("error executing search - ", p.RawMap())
 	}
 
-	a.log.Traceln("Find() result:")
+	a.log.Traceln("search result:")
 	a.log.Traceln(p)
-	return getList(params, p)
+	list := getHits(params, p)
+	result := list.MapOver(func(in moleculer.Payload) moleculer.Payload {
+		return in.Get("_source")
+	})
+	a.log.Traceln("find result transformed: ")
+	a.log.Traceln(result)
+	return result
 }
 
 func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {
