@@ -82,6 +82,14 @@ func (a *Adapter) Disconnect() error {
 	return nil
 }
 
+// WIP allow for defining field types
+// func (a *Adapter) mappings() {
+// 	req := esapi.IndicesPutMappingRequest{
+// 		Index: []string{},
+
+// 	}
+// }
+
 func (a *Adapter) indexRequest(req esapi.IndexRequest) moleculer.Payload {
 	res, err := req.Do(context.Background(), a.es)
 	if err != nil {
@@ -101,6 +109,7 @@ func (a *Adapter) indexRequest(req esapi.IndexRequest) moleculer.Payload {
 	return result
 }
 
+//parseResponse parse the elastic response
 func (a *Adapter) parseResponse(res *esapi.Response, err error, errorMsg string) moleculer.Payload {
 	if err != nil {
 		return payload.New(err)
@@ -111,11 +120,6 @@ func (a *Adapter) parseResponse(res *esapi.Response, err error, errorMsg string)
 	}
 	result := a.serializer.ReaderToPayload(res.Body)
 	return result
-}
-
-func (a *Adapter) deleteByQuery(req esapi.DeleteByQueryRequest) moleculer.Payload {
-	res, err := req.Do(context.Background(), a.es)
-	return a.parseResponse(res, err, "Error deleting docs by query")
 }
 
 func (a *Adapter) Insert(params moleculer.Payload) moleculer.Payload {
@@ -129,7 +133,7 @@ func (a *Adapter) Insert(params moleculer.Payload) moleculer.Payload {
 }
 
 func (a *Adapter) RemoveAll() moleculer.Payload {
-	return a.deleteByQuery(esapi.DeleteByQueryRequest{
+	req := esapi.DeleteByQueryRequest{
 		Index: []string{a.indexName},
 		Body: strings.NewReader(`
 		{
@@ -137,7 +141,18 @@ func (a *Adapter) RemoveAll() moleculer.Payload {
 			  "match_all": {}
 			}
 		}`),
-	})
+	}
+	res, err := req.Do(context.Background(), a.es)
+	return a.parseResponse(res, err, "Error deleting docs by query")
+}
+
+func (a *Adapter) RemoveById(id moleculer.Payload) moleculer.Payload {
+	req := esapi.DeleteRequest{
+		Index:      a.indexName,
+		DocumentID: id.String(),
+	}
+	res, err := req.Do(context.Background(), a.es)
+	return a.parseResponse(res, err, "Error deleting docs by id: "+id.String())
 }
 
 func parseSearchFields(params, query moleculer.Payload) moleculer.Payload {
