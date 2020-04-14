@@ -86,6 +86,8 @@ github.com/moleculer-go/moleculer v0.2.2-0.20200413112349-6b5506ae07b4 h1:B8VVux
 github.com/moleculer-go/moleculer v0.2.2-0.20200413112349-6b5506ae07b4/go.mod h1:KO1cQH8wAIx9PyUjj9DkQnO7JhnupoYPMwgJL5qmJEo=
 github.com/moleculer-go/moleculer v0.2.2-0.20200413112622-fa770e6794ed h1:Up7g8adnmTy3T9gyq2Dq7Wk0ijpDGG5WVJ44aKilU3k=
 github.com/moleculer-go/moleculer v0.2.2-0.20200413112622-fa770e6794ed/go.mod h1:KO1cQH8wAIx9PyUjj9DkQnO7JhnupoYPMwgJL5qmJEo=
+github.com/moleculer-go/moleculer v0.2.4 h1:WavRO3DQLZoqJZ9mzGwiZPRdgP19JdAprIxslVWmWpY=
+github.com/moleculer-go/moleculer v0.2.4/go.mod h1:KO1cQH8wAIx9PyUjj9DkQnO7JhnupoYPMwgJL5qmJEo=
 github.com/moleculer-go/spew v1.2.0 h1:Ko5FrSdx9ssnYhjS6OMgMFtN6omV4ZfVccljU8Ccth0=
 github.com/moleculer-go/spew v1.2.0/go.mod h1:R1AWW56BWfDlXLJ6i5YB4uWzqhI1iiE6dU6MJ4w2iiE=
 github.com/nats-io/gnatsd v1.4.1 h1:RconcfDeWpKCD6QIIwiVFcvForlXpWeJP7i5/lDLy44=
