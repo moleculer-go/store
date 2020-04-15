@@ -25,6 +25,7 @@ type Adapter struct {
 	connected  bool
 	log        *log.Entry
 	settings   map[string]interface{}
+	mappings   map[string]interface{}
 	serializer serializer.Serializer
 }
 
@@ -42,13 +43,16 @@ func (a *Adapter) loadSettings(settings map[string]interface{}) {
 	if indexName, ok := settings["indexName"].(string); ok {
 		a.indexName = indexName
 	}
+	if mappings, ok := settings["mappings"].(map[string]interface{}); ok {
+		a.mappings = mappings
+	}
 }
 
 func (a *Adapter) printClusterInfo() {
 	// 1. Get cluster info
 	res, err := a.es.Info()
 	if err != nil {
-		a.log.Errorln("Could not get cluser Info - source: " + err.Error())
+		a.log.Errorln("Could not get cluster Info - source: " + err.Error())
 		return
 	}
 	defer res.Body.Close()
@@ -61,24 +65,79 @@ func (a *Adapter) printClusterInfo() {
 	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
 		a.log.Errorln("Error parsing the response body: " + res.String())
 	}
+
 	// Print client and server version numbers.
-	a.log.Printf("Client: %s", elastic.Version)
-	a.log.Printf("Server: %s", r["version"].(map[string]interface{})["number"])
-	a.log.Println(strings.Repeat("~", 37))
-	a.log.Println("Elastic Search Connected !")
+	a.log.Infoln(strings.Repeat("~", 37))
+	a.log.Infoln("Elastic Search Connected !")
+	a.log.Infof("Client: %s", elastic.Version)
+	a.log.Infof("Server: %s", r["version"].(map[string]interface{})["number"])
 }
 
 func (a *Adapter) Connect() error {
 	es, err := elastic.NewDefaultClient()
 	if err != nil {
-		return errors.New("Could not client - source: " + err.Error())
+		return errors.New("Could not create client - error: " + err.Error())
 	}
 	a.es = es
 	a.printClusterInfo()
+	err = a.setupIndex()
+	return err
+}
+
+//createIndex
+func (a *Adapter) createIndex() error {
+	if len(a.mappings) == 0 {
+		return nil
+	}
+	params := payload.Empty().Add("mappings", a.mappings)
+	req := esapi.IndicesCreateRequest{
+		Index: a.indexName,
+		Body:  strings.NewReader(a.serializer.PayloadToString(params)),
+	}
+	res, err := req.Do(context.Background(), a.es)
+	r := a.handleResponse(res, err, "Error creating index: "+a.indexName)
+	if r.IsError() {
+		return r.Error()
+	}
 	return nil
 }
 
+//updateMappings update the field mapping in the index
+func (a *Adapter) updateMappings() error {
+	if len(a.mappings) == 0 {
+		return nil
+	}
+	properties := a.mappings["properties"].(map[string]interface{})
+	if len(properties) == 0 {
+		return nil
+	}
+
+	//for field, params := range properties.Map() {
+	req := esapi.IndicesPutMappingRequest{
+		Index: []string{a.indexName},
+		Body:  strings.NewReader(a.serializer.PayloadToString(payload.Empty().Add("properties", properties))),
+	}
+	res, err := req.Do(context.Background(), a.es)
+	r := a.handleResponse(res, err, "Error updating mappings for index: "+a.indexName)
+	if r.IsError() {
+		a.log.Error(r.Error())
+		return r.Error()
+	}
+	return nil
+}
+
+//setupIndex tried to create the index if defined in the service settings
+func (a *Adapter) setupIndex() error {
+	err := a.createIndex()
+	if err != nil {
+		a.log.Error("Error trying to create Index - error: " + err.Error())
+		err = a.updateMappings()
+	}
+	return err
+}
+
 func (a *Adapter) Disconnect() error {
+	a.es = nil
 	return nil
 }
 
@@ -109,17 +168,20 @@ func (a *Adapter) indexRequest(req esapi.IndexRequest) moleculer.Payload {
 	return result
 }
 
-//parseResponse parse the elastic response
-func (a *Adapter) parseResponse(res *esapi.Response, err error, errorMsg string) moleculer.Payload {
+//handleResponse parse the elastic response
+func (a *Adapter) handleResponse(res *esapi.Response, err error, errorMsg string) moleculer.Payload {
 	if err != nil {
 		return payload.New(err)
 	}
 	defer res.Body.Close()
+	r := a.serializer.ReaderToPayload(res.Body)
 	if res.IsError() {
-		return payload.New(errors.New("[" + res.Status() + "] " + errorMsg))
+		errorMsg = errorMsg + " - root cause: " + r.Get("error").Get("root_cause").First().Get("reason").String()
+		a.log.Error(errorMsg)
+		a.log.Trace("Error payload: ", r)
+		return payload.PayloadError(errorMsg, r)
 	}
-	result := a.serializer.ReaderToPayload(res.Body)
-	return result
+	return r
 }
 
 func (a *Adapter) Insert(params moleculer.Payload) moleculer.Payload {
@@ -143,7 +205,7 @@ func (a *Adapter) RemoveAll() moleculer.Payload {
 		}`),
 	}
 	res, err := req.Do(context.Background(), a.es)
-	return a.parseResponse(res, err, "Error deleting docs by query")
+	return a.handleResponse(res, err, "Error deleting docs by query")
 }
 
 func (a *Adapter) RemoveById(id moleculer.Payload) moleculer.Payload {
@@ -152,7 +214,7 @@ func (a *Adapter) RemoveById(id moleculer.Payload) moleculer.Payload {
 		DocumentID: id.String(),
 	}
 	res, err := req.Do(context.Background(), a.es)
-	return a.parseResponse(res, err, "Error deleting docs by id: "+id.String())
+	return a.handleResponse(res, err, "Error deleting docs by id: "+id.String())
 }
 
 func parseSearchFields(params, query moleculer.Payload) moleculer.Payload {

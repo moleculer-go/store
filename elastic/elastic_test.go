@@ -179,6 +179,12 @@ var _ = Describe("Elastic", func() {
 		adapter := Adapter{}
 		adapter.Init(logger, map[string]interface{}{
 			"indexName": "find_sort_test_index",
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"id":   map[string]string{"type": "integer"},
+					"name": map[string]string{"type": "keyword"},
+				},
+			},
 		})
 		adapter.Connect()
 		adapter.RemoveAll()
@@ -207,13 +213,29 @@ var _ = Describe("Elastic", func() {
 		Expect(r.Array()[5].Get("name").String()).Should(Equal("f"))
 
 		//Waiting for feature to defined the indexed fields for a given entity
-		// r = adapter.Find(payload.New(map[string]interface{}{
-		// 	"sort": "-name",
-		// }))
-		// Expect(r.Len()).Should(Equal(6))
-		// Expect(r.Array()[0].Get("name").String()).Should(Equal("f"))
-		// Expect(r.Array()[1].Get("name").String()).Should(Equal("e"))
-		// Expect(r.Array()[5].Get("name").String()).Should(Equal("a"))
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"sort": "-name",
+		}))
+		Expect(r.Len()).Should(Equal(6))
+		Expect(r.Array()[0].Get("name").String()).Should(Equal("f"))
+		Expect(r.Array()[1].Get("name").String()).Should(Equal("e"))
+		Expect(r.Array()[5].Get("name").String()).Should(Equal("a"))
 
+	})
+
+	It("should create an index with the proper field mappings", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "index_mappings_test_index",
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"age":   map[string]string{"type": "integer"},
+					"email": map[string]string{"type": "keyword"},
+					"name":  map[string]string{"type": "text"},
+				},
+			},
+		})
+		Expect(adapter.Connect()).Should(Succeed())
+		adapter.Disconnect()
 	})
 })
