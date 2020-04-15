@@ -200,7 +200,7 @@ func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
 	req := esapi.UpdateRequest{
 		Index:      a.indexName,
 		DocumentID: id.String(),
-		Body:       strings.NewReader(a.serializer.PayloadToString(update)),
+		Body:       strings.NewReader(a.serializer.PayloadToString(payload.Empty().Add("doc", update))),
 		Refresh:    "true",
 	}
 	res, err := req.Do(context.Background(), a.es)
