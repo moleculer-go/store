@@ -159,16 +159,15 @@ func (a *Adapter) handleResponse(res *esapi.Response, err error, errorMsg string
 
 //Insert index document
 func (a *Adapter) Insert(params moleculer.Payload) moleculer.Payload {
-	documentID := util.RandomString(12)
 	req := esapi.IndexRequest{
 		Index:      a.indexName,
-		DocumentID: documentID,
+		DocumentID: util.RandomString(12),
 		Body:       strings.NewReader(a.serializer.PayloadToString(params)),
 		Refresh:    "true",
 	}
 	res, err := req.Do(context.Background(), a.es)
-	p := a.handleResponse(res, err, "Error indexing documentID: "+documentID)
-	return p.Add("documentID", req.DocumentID)
+	a.handleResponse(res, err, "Error indexing documentID: "+req.DocumentID)
+	return params.Add("documentID", req.DocumentID)
 }
 
 //RemoveAll remove all documents from the index
@@ -193,6 +192,14 @@ func (a *Adapter) RemoveById(id moleculer.Payload) moleculer.Payload {
 	}
 	res, err := req.Do(context.Background(), a.es)
 	return a.handleResponse(res, err, "Error deleting docs by id: "+id.String())
+}
+
+func (adapter *Adapter) Update(params moleculer.Payload) moleculer.Payload {
+	id := params.Get("documentID")
+	if !id.Exists() {
+		return payload.Error("Cannot update record without documentID")
+	}
+	return adapter.UpdateById(id, params.Remove("documentID"))
 }
 
 //UpdateById update document by id

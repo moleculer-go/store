@@ -299,4 +299,31 @@ var _ = Describe("Elastic", func() {
 		Expect(r.IsError()).Should(BeFalse())
 		Expect(r.First().Get("age").Int()).Should(Equal(28))
 	})
+
+	It("should update the document", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "update_by_id_test_index",
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"age":  map[string]string{"type": "long"},
+					"name": map[string]string{"type": "text"},
+				},
+			},
+		})
+		adapter.Connect()
+		adapter.RemoveAll()
+
+		r1 := adapter.Insert(payload.Empty().Add("age", 18).Add("name", "anne"))
+
+		r := adapter.Update(r1.Add("age", 38))
+		Expect(r.IsError()).Should(BeFalse())
+
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"search":       "anne",
+			"searchFields": []string{"name"},
+		}))
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.First().Get("age").Int()).Should(Equal(38))
+	})
 })
