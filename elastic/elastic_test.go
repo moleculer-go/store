@@ -238,4 +238,30 @@ var _ = Describe("Elastic", func() {
 		Expect(adapter.Connect()).Should(Succeed())
 		adapter.Disconnect()
 	})
+
+	It("should remove documents using RemoveById :)", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "delete_by_id_test_index",
+		})
+		adapter.Connect()
+		adapter.RemoveAll()
+
+		r1 := adapter.Insert(payload.Empty().Add("id", 1).Add("name", "1"))
+		r2 := adapter.Insert(payload.Empty().Add("id", 2).Add("name", "2"))
+
+		r := adapter.RemoveById(r1.Get("documentID"))
+		Expect(r.IsError()).Should(BeFalse())
+
+		r = adapter.Find(payload.Empty())
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Len()).Should(Equal(1))
+
+		r = adapter.RemoveById(r2.Get("documentID"))
+		Expect(r.IsError()).Should(BeFalse())
+
+		r = adapter.Find(payload.Empty())
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Len()).Should(Equal(0))
+	})
 })

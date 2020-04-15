@@ -141,33 +141,6 @@ func (a *Adapter) Disconnect() error {
 	return nil
 }
 
-// WIP allow for defining field types
-// func (a *Adapter) mappings() {
-// 	req := esapi.IndicesPutMappingRequest{
-// 		Index: []string{},
-
-// 	}
-// }
-
-func (a *Adapter) indexRequest(req esapi.IndexRequest) moleculer.Payload {
-	res, err := req.Do(context.Background(), a.es)
-	if err != nil {
-		return payload.New(err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return payload.New(errors.New("[" + res.Status() + "] Error indexing document ID=" + req.DocumentID))
-	}
-
-	result := a.serializer.ReaderToPayload(res.Body)
-
-	a.log.Debugf("indexRequest () Status: %s - Result: %s = Version: %d", res.Status(), result.Get("result").String(), result.Get("_version").Int())
-
-	result = result.Add("documentID", req.DocumentID)
-	return result
-}
-
 //handleResponse parse the elastic response
 func (a *Adapter) handleResponse(res *esapi.Response, err error, errorMsg string) moleculer.Payload {
 	if err != nil {
@@ -184,37 +157,54 @@ func (a *Adapter) handleResponse(res *esapi.Response, err error, errorMsg string
 	return r
 }
 
+//Insert index document
 func (a *Adapter) Insert(params moleculer.Payload) moleculer.Payload {
-	result := a.indexRequest(esapi.IndexRequest{
+	documentID := util.RandomString(12)
+	req := esapi.IndexRequest{
 		Index:      a.indexName,
-		DocumentID: util.RandomString(12),
+		DocumentID: documentID,
 		Body:       strings.NewReader(a.serializer.PayloadToString(params)),
 		Refresh:    "true",
-	})
-	return result
+	}
+	res, err := req.Do(context.Background(), a.es)
+	p := a.handleResponse(res, err, "Error indexing documentID: "+documentID)
+	return p.Add("documentID", req.DocumentID)
 }
 
+//RemoveAll remove all documents from the index
 func (a *Adapter) RemoveAll() moleculer.Payload {
 	req := esapi.DeleteByQueryRequest{
 		Index: []string{a.indexName},
 		Body: strings.NewReader(`
-		{
-			"query": {
-			  "match_all": {}
-			}
-		}`),
+		{"query": {
+		  "match_all": {}
+		}}`),
 	}
 	res, err := req.Do(context.Background(), a.es)
 	return a.handleResponse(res, err, "Error deleting docs by query")
 }
 
+//RemoveById remove document from the index by id
 func (a *Adapter) RemoveById(id moleculer.Payload) moleculer.Payload {
 	req := esapi.DeleteRequest{
 		Index:      a.indexName,
 		DocumentID: id.String(),
+		Refresh:    "true",
 	}
 	res, err := req.Do(context.Background(), a.es)
 	return a.handleResponse(res, err, "Error deleting docs by id: "+id.String())
+}
+
+//UpdateById update document by id
+func (a *Adapter) UpdateById(id, update moleculer.Payload) moleculer.Payload {
+	req := esapi.UpdateRequest{
+		Index:      a.indexName,
+		DocumentID: id.String(),
+		Body:       strings.NewReader(a.serializer.PayloadToString(update)),
+		Refresh:    "true",
+	}
+	res, err := req.Do(context.Background(), a.es)
+	return a.handleResponse(res, err, "Error updating doc by id: "+id.String())
 }
 
 func parseSearchFields(params, query moleculer.Payload) moleculer.Payload {
@@ -349,6 +339,7 @@ func (a *Adapter) Find(params moleculer.Payload) moleculer.Payload {
 	return result
 }
 
+//FindOne find document return just the first match
 func (a *Adapter) FindOne(params moleculer.Payload) moleculer.Payload {
 	return a.Find(params.Add("limit", 1)).First()
 }
