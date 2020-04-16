@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/moleculer-go/moleculer/payload"
+	"github.com/moleculer-go/moleculer/serializer"
 
 	"github.com/moleculer-go/moleculer"
 
@@ -49,9 +50,10 @@ type Adapter struct {
 	log       *log.Entry
 	settings  map[string]interface{}
 
-	fields   []string
-	idField  string
-	idColumn *Column
+	fields     []string
+	idField    string
+	idColumn   *Column
+	serializer serializer.Serializer
 }
 
 func (a *Adapter) Init(log *log.Entry, settings map[string]interface{}) {
@@ -71,6 +73,7 @@ func (a *Adapter) Init(log *log.Entry, settings map[string]interface{}) {
 	a.waitForPoolLimit = time.Millisecond * 500
 	a.waitConnectionsLimit = time.Second * 2
 	a.loadSettings(a.settings)
+	a.serializer = serializer.CreateJSONSerializer(a.log)
 }
 
 var pools map[string]*sqlitex.Pool
@@ -717,6 +720,13 @@ func (a *Adapter) transformIn(field string, value interface{}) interface{} {
 		}
 		return strings.Join(list, listSeparator)
 	}
+	if t == "map" {
+		m, valid := value.(map[string]interface{})
+		if !valid {
+			return nil
+		}
+		return a.serializer.MapToString(m)
+	}
 	if t == "[]byte" {
 		bytes, valid := value.([]byte)
 		if !valid {
@@ -768,6 +778,9 @@ func (a *Adapter) transformOut(field string, value interface{}) interface{} {
 	if t == "[]string" {
 		return strings.Split(value.(string), listSeparator)
 	}
+	if t == "map" {
+		return a.serializer.StringToMap(value.(string))
+	}
 	if t == "[]byte" {
 		return []byte(value.(string))
 	}
@@ -788,9 +801,10 @@ func (a *Adapter) rowToPayload(fields []string, stmt *sqlite.Stmt) moleculer.Pay
 	data := map[string]interface{}{}
 	for _, c := range fields {
 		value := a.transformOut(c, a.columnValue(c, stmt))
-		if value != 0 && value != "" {
-			data[c] = value
+		if value == 0 || value == "" {
+			break
 		}
+		data[c] = value
 	}
 	return payload.New(data)
 }
