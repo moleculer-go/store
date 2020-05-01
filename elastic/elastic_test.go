@@ -34,6 +34,7 @@ var _ = Describe("Elastic", func() {
 		})
 		err := adapter.Connect()
 		Expect(err).Should(BeNil())
+		adapter.RemoveAll()
 
 		p := payload.Empty().Add("field", "content")
 		r := adapter.Insert(p)
@@ -43,12 +44,13 @@ var _ = Describe("Elastic", func() {
 		Expect(adapter.es).ShouldNot(BeNil())
 	})
 
-	It("should get a document", func() {
+	It("will insert 2 docs and should get one document that matches the search", func() {
 		adapter := Adapter{}
 		adapter.Init(logger, map[string]interface{}{
 			"indexName": "get_test_index",
 		})
 		adapter.Connect()
+		adapter.RemoveAll()
 
 		content := util.RandomString(12)
 		name := util.RandomString(12)
@@ -74,5 +76,254 @@ var _ = Describe("Elastic", func() {
 		Expect(r).ShouldNot(BeNil())
 		Expect(r.Error()).Should(Succeed())
 		Expect(r.Len()).Should(Equal(1))
+	})
+
+	It("will insert 2 docs and should return just one using the limit parameter", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "limit_test_index",
+		})
+		adapter.Connect()
+		adapter.RemoveAll()
+
+		adapter.Insert(payload.Empty().Add("content", util.RandomString(12)).Add("name", "limited"))
+		adapter.Insert(payload.Empty().Add("content", util.RandomString(12)).Add("name", "limited"))
+
+		r := adapter.Find(payload.New(map[string]interface{}{
+			"search":       "limited",
+			"searchFields": []string{"name"},
+			"limit":        1,
+		}))
+
+		Expect(r).ShouldNot(BeNil())
+		Expect(r.Error()).Should(Succeed())
+		Expect(r.Len()).Should(Equal(1))
+	})
+
+	It("Find should return just one record when limit = 1", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "limit_test_index",
+		})
+		adapter.Connect()
+		adapter.RemoveAll()
+
+		adapter.Insert(payload.Empty().Add("content", util.RandomString(12)).Add("name", "limited"))
+		adapter.Insert(payload.Empty().Add("content", util.RandomString(12)).Add("name", "limited"))
+
+		r := adapter.Find(payload.New(map[string]interface{}{
+			"search":       "limited",
+			"searchFields": []string{"name"},
+			"limit":        1,
+		}))
+
+		Expect(r).ShouldNot(BeNil())
+		Expect(r.Error()).Should(Succeed())
+		Expect(r.Len()).Should(Equal(1))
+	})
+
+	It("parseQueryParams should parse sort parameter", func() {
+		out := parseQueryParams(payload.Empty().Add("sort", "-id name"))
+		Expect(out.Get("sort").Get("id").String()).Should(Equal("desc"))
+		Expect(out.Get("sort").Get("name").String()).Should(Equal("asc"))
+	})
+
+	It("Find should respect offset and limit", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "find_offset_test_index",
+		})
+		adapter.Connect()
+
+		adapter.Insert(payload.Empty().Add("id", 1).Add("name", "1"))
+		adapter.Insert(payload.Empty().Add("id", 2).Add("name", "2"))
+		adapter.Insert(payload.Empty().Add("id", 3).Add("name", "3"))
+		adapter.Insert(payload.Empty().Add("id", 4).Add("name", "4"))
+		adapter.Insert(payload.Empty().Add("id", 5).Add("name", "5"))
+		adapter.Insert(payload.Empty().Add("id", 6).Add("name", "6"))
+
+		r := adapter.Find(payload.New(map[string]interface{}{
+			"offset": 1,
+			"limit":  2,
+		}))
+		Expect(r.Len()).Should(Equal(2))
+		Expect(r.Array()[0].Get("name").String()).Should(Equal("2"))
+		Expect(r.Array()[1].Get("name").String()).Should(Equal("3"))
+
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"offset": 2,
+			"limit":  3,
+		}))
+		Expect(r.Len()).Should(Equal(3))
+		Expect(r.Array()[0].Get("name").String()).Should(Equal("3"))
+		Expect(r.Array()[1].Get("name").String()).Should(Equal("4"))
+
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"offset": 3,
+			"limit":  2,
+		}))
+		Expect(r.Len()).Should(Equal(2))
+		Expect(r.Array()[0].Get("name").String()).Should(Equal("4"))
+		Expect(r.Array()[1].Get("name").String()).Should(Equal("5"))
+
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"offset": 4,
+			"limit":  2,
+		}))
+		Expect(r.Len()).Should(Equal(2))
+		Expect(r.Array()[0].Get("name").String()).Should(Equal("5"))
+		Expect(r.Array()[1].Get("name").String()).Should(Equal("6"))
+	})
+
+	It("Find should respect sort params", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "find_sort_test_index",
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"id":   map[string]string{"type": "integer"},
+					"name": map[string]string{"type": "keyword"},
+				},
+			},
+		})
+		adapter.Connect()
+		adapter.RemoveAll()
+
+		adapter.Insert(payload.Empty().Add("id", 1).Add("name", "a"))
+		adapter.Insert(payload.Empty().Add("id", 2).Add("name", "b"))
+		adapter.Insert(payload.Empty().Add("id", 2).Add("name", "c"))
+		adapter.Insert(payload.Empty().Add("id", 4).Add("name", "d"))
+		adapter.Insert(payload.Empty().Add("id", 5).Add("name", "e"))
+		adapter.Insert(payload.Empty().Add("id", 6).Add("name", "f"))
+
+		r := adapter.Find(payload.New(map[string]interface{}{
+			"sort": "-id",
+		}))
+		Expect(r.Len()).Should(Equal(6))
+		Expect(r.Array()[0].Get("name").String()).Should(Equal("f"))
+		Expect(r.Array()[1].Get("name").String()).Should(Equal("e"))
+		Expect(r.Array()[5].Get("name").String()).Should(Equal("a"))
+
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"sort": "id",
+		}))
+		Expect(r.Len()).Should(Equal(6))
+		Expect(r.Array()[0].Get("name").String()).Should(Equal("a"))
+		Expect(r.Array()[1].Get("name").String()).Should(Equal("b"))
+		Expect(r.Array()[5].Get("name").String()).Should(Equal("f"))
+
+		//Waiting for feature to defined the indexed fields for a given entity
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"sort": "-name",
+		}))
+		Expect(r.Len()).Should(Equal(6))
+		Expect(r.Array()[0].Get("name").String()).Should(Equal("f"))
+		Expect(r.Array()[1].Get("name").String()).Should(Equal("e"))
+		Expect(r.Array()[5].Get("name").String()).Should(Equal("a"))
+
+	})
+
+	It("should create an index with the proper field mappings", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "index_mappings_test_index",
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"age":   map[string]string{"type": "integer"},
+					"email": map[string]string{"type": "keyword"},
+					"name":  map[string]string{"type": "text"},
+				},
+			},
+		})
+		Expect(adapter.Connect()).Should(Succeed())
+		adapter.Disconnect()
+	})
+
+	It("should remove documents using RemoveById :)", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "delete_by_id_test_index",
+		})
+		adapter.Connect()
+		adapter.RemoveAll()
+
+		r1 := adapter.Insert(payload.Empty().Add("id", 1).Add("name", "1"))
+		r2 := adapter.Insert(payload.Empty().Add("id", 2).Add("name", "2"))
+
+		r := adapter.RemoveById(r1.Get("documentID"))
+		Expect(r.IsError()).Should(BeFalse())
+
+		r = adapter.Find(payload.Empty())
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Len()).Should(Equal(1))
+
+		r = adapter.RemoveById(r2.Get("documentID"))
+		Expect(r.IsError()).Should(BeFalse())
+
+		r = adapter.Find(payload.Empty())
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.Len()).Should(Equal(0))
+	})
+
+	It("should update documents by id", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "update_by_id_test_index",
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"age":  map[string]string{"type": "long"},
+					"name": map[string]string{"type": "text"},
+				},
+			},
+		})
+		adapter.Connect()
+		adapter.RemoveAll()
+
+		r1 := adapter.Insert(payload.Empty().Add("age", 18).Add("name", "anne"))
+		adapter.Insert(payload.Empty().Add("age", 22).Add("name", "john"))
+
+		r := adapter.Find(payload.New(map[string]interface{}{
+			"search":       "anne",
+			"searchFields": []string{"name"},
+		}))
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.First().Get("age").Int()).Should(Equal(18))
+
+		r = adapter.UpdateById(r1.Get("documentID"), payload.Empty().Add("age", 28))
+		Expect(r.IsError()).Should(BeFalse())
+
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"search":       "anne",
+			"searchFields": []string{"name"},
+		}))
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.First().Get("age").Int()).Should(Equal(28))
+	})
+
+	It("should update the document", func() {
+		adapter := Adapter{}
+		adapter.Init(logger, map[string]interface{}{
+			"indexName": "update_by_id_test_index",
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"age":  map[string]string{"type": "long"},
+					"name": map[string]string{"type": "text"},
+				},
+			},
+		})
+		adapter.Connect()
+		adapter.RemoveAll()
+
+		r1 := adapter.Insert(payload.Empty().Add("age", 18).Add("name", "anne"))
+
+		r := adapter.Update(r1.Add("age", 38))
+		Expect(r.IsError()).Should(BeFalse())
+
+		r = adapter.Find(payload.New(map[string]interface{}{
+			"search":       "anne",
+			"searchFields": []string{"name"},
+		}))
+		Expect(r.IsError()).Should(BeFalse())
+		Expect(r.First().Get("age").Int()).Should(Equal(38))
 	})
 })

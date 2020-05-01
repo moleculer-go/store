@@ -9,7 +9,13 @@ services:
   - name: mongo
     image: mongo:4
     command: [--smallfiles]
-
+    ports:
+      - 27017
+  - name: elastic
+    image: elasticsearch:7.6.0
+    ports:
+      - 9200
+      - 9300
 steps:
   - name: tests
     image: golang

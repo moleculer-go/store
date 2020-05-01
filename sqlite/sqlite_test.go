@@ -259,6 +259,53 @@ var _ = Describe("Sqlite", func() {
 
 	})
 
+	Describe("Storing maps with nested data", func() {
+		It("should save and restore compplex map data", func() {
+			table := "events"
+			adapter := Adapter{
+				URI:      "file:memory:?mode=memory",
+				Flags:    0,
+				PoolSize: 1,
+				Table:    table,
+				Columns: []Column{
+					{
+						Name: "eventId",
+						Type: "string",
+					},
+					{
+						Name: "content",
+						Type: "map",
+					},
+				},
+			}
+			log.SetLevel(logLevel)
+			adapter.Init(log.WithField("", ""), M{})
+			adapter.Connect()
+			adapter.RemoveAll()
+
+			adapter.Insert(payload.New(M{
+				"eventId": "0001",
+				"content": map[string]interface{}{
+					"name": "John",
+					"address": map[string]interface{}{
+						"street": "tamara tce",
+						"number": 500,
+					},
+				},
+			}))
+
+			l := adapter.Find(payload.Empty())
+			ev := l.First()
+			Expect(ev.Get("eventId").String()).Should(Equal("0001"))
+
+			Expect(ev.Get("content").Get("name").String()).Should(Equal("John"))
+			Expect(ev.Get("content").Get("address").Get("street").String()).Should(Equal("tamara tce"))
+			Expect(ev.Get("content").Get("address").Get("number").Int()).Should(Equal(500))
+
+			adapter.Disconnect()
+		})
+	})
+
 	Describe("Find options", func() {
 
 		var adapter Adapter
