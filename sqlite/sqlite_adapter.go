@@ -748,6 +748,13 @@ func (a *Adapter) transformIn(field string, value interface{}) interface{} {
 	if t == "date" || t == "datetime" {
 		t, valid := value.(time.Time)
 		if !valid {
+			sValue, valid := value.(string)
+			if valid {
+				_, sError := time.Parse(ISO8601, sValue)
+				if sError != nil {
+					return sValue
+				}
+			}
 			return nil
 		}
 		v := t.UTC().Format(ISO8601)
