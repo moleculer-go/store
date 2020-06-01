@@ -7,7 +7,7 @@ platform:
 
 services:
   - name: mongo
-    image: mongo:4
+    image: mongo:3
     command: [--smallfiles]
     ports:
       - 27017
