@@ -7,9 +7,15 @@ platform:
 
 services:
   - name: mongo
-    image: mongo:4
+    image: mongo:3
     command: [--smallfiles]
-
+    ports:
+      - 27017
+  - name: elastic
+    image: elasticsearch:7.6.0
+    ports:
+      - 9200
+      - 9300
 steps:
   - name: tests
     image: golang
@@ -20,7 +26,7 @@ steps:
         from_secret: COVERALLS_TOKEN
     commands:
       - export MONGO_TEST_HOST="mongo"
-      - go run github.com/onsi/ginkgo/ginkgo -r -randomizeAllSpecs -cover -trace
+      - go run github.com/onsi/ginkgo/ginkgo -r -randomizeAllSpecs -cover -trace -skipPackage=mongo
       - go run github.com/modocache/gover ./ coverage.txt
       - curl -s https://codecov.io/bash | bash || echo "Failed to upload to codecov!"
       - go run github.com/mattn/goveralls -coverprofile=coverage.txt -service=drone.io || echo "Failed to upload to coverrals!"
