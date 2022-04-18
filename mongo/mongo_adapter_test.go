@@ -78,6 +78,7 @@ var _ = Describe("Mongo Adapter", func() {
 		})
 
 		//Sort apprently not working in this client
+		//TODO improve test to now relay on snapshot.. which is causing the test to fail
 		XIt("should sort the results", func() {
 			result := adapter.Find(payload.New(M{
 				"query": M{},
