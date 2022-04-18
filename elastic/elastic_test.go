@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var _ = Describe("Elastic", func() {
+var _ = XDescribe("Elastic", func() {
 
 	log.SetLevel(log.InfoLevel)
 	log.SetFormatter(&log.TextFormatter{

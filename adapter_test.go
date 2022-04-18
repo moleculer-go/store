@@ -12,14 +12,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func contextAndDelegated(nodeID string, config moleculer.Config) (moleculer.BrokerContext, *moleculer.BrokerDelegates) {
-	dl := test.DelegatesWithIdAndConfig(nodeID, config)
-	ctx := context.BrokerContext(dl)
-	return ctx, dl
-}
-
-type M map[string]interface{}
-
 var _ = Describe("Moleculer DB Mixin", func() {
 
 	Describe("list action", func() {
@@ -201,7 +193,6 @@ var _ = Describe("Moleculer DB Mixin", func() {
 			params := payload.New(M{"": ""})
 			settingsPopulates := M{"master": "users.get"}
 			mcalls := createPopulateMCalls(result, params, settingsPopulates, []string{"master"})
-
 			r := payload.New(mcalls)
 			Expect(r.Get(userID + "_master_users.get").Exists()).Should(BeTrue())
 			Expect(r.Get(userID + "_master_users.get").Get("action").Exists()).Should(BeTrue())
@@ -624,3 +615,11 @@ var _ = Describe("Moleculer DB Mixin", func() {
 	})
 
 })
+
+func contextAndDelegated(nodeID string, config moleculer.Config) (moleculer.BrokerContext, *moleculer.BrokerDelegates) {
+	dl := test.DelegatesWithIdAndConfig(nodeID, config)
+	ctx := context.BrokerContext(dl)
+	return ctx, dl
+}
+
+type M map[string]interface{}

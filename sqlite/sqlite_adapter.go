@@ -741,7 +741,7 @@ func (a *Adapter) transformIn(field string, value interface{}) interface{} {
 		}
 		sList := []string{}
 		for _, v := range list {
-			sList = append(sList, string(v))
+			sList = append(sList, fmt.Sprint(v))
 		}
 		return strings.Join(sList, listSeparator)
 	}
