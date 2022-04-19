@@ -59,16 +59,14 @@ func (adapter *MongoAdapter) Connect() error {
 
 func (adapter *MongoAdapter) checkConnected() {
 	var start = time.Now()
+	for {
+		if adapter.coll != nil || time.Since(start) >= adapter.Timeout {
+			return
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
 	if adapter.coll == nil {
-		for {
-			if adapter.coll != nil || time.Since(start) >= adapter.Timeout {
-				return
-			}
-			time.Sleep(time.Millisecond * 100)
-		}
-		if adapter.coll == nil {
-			panic("Adapter not connected!")
-		}
+		panic("Adapter not connected!")
 	}
 }
 
